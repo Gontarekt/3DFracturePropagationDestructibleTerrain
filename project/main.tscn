@@ -9,3 +9,6 @@ amplitude = 60.0
 speed = 4.3
 position = Vector2(330, 198)
 texture = ExtResource("1_ig7tw")
+
+[node name="VoxelCube" type="VoxelCube" parent="." unique_id=700482619]
+size = Vector3i(7, 6, 1)

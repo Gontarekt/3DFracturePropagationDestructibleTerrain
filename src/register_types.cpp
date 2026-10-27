@@ -1,6 +1,7 @@
 #include "register_types.h"
 
 #include "gdexample.h"
+#include "voxel_cube.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/defs.hpp>
@@ -14,6 +15,7 @@ void initialize_example_module(ModuleInitializationLevel p_level) {
 	}
 
 	GDREGISTER_RUNTIME_CLASS(GDExample);
+	GDREGISTER_RUNTIME_CLASS(VoxelCube);
 }
 
 void uninitialize_example_module(ModuleInitializationLevel p_level) {

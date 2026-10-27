@@ -1,3 +1,8 @@
+/*
+ * Note bind methods needs args to match the exact name of the function parameter (e.g. p_amplitude for set_amplitude)
+ *
+ */
+
 #include "gdexample.h"
 #include <godot_cpp/core/class_db.hpp>
 
