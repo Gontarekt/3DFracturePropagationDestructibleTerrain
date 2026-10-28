@@ -6,7 +6,7 @@
 ambient_light_color = Color(1, 1, 1, 1)
 ambient_light_energy = 2.85
 
-[sub_resource type="ArrayMesh" id="ArrayMesh_7dm0k"]
+[sub_resource type="ArrayMesh" id="ArrayMesh_jjgbg"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_7dm0k"]
 
@@ -28,7 +28,7 @@ script = ExtResource("1_jjgbg")
 size = Vector3i(7, 6, 2)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="VoxelCube" unique_id=27774150]
-mesh = SubResource("ArrayMesh_7dm0k")
+mesh = SubResource("ArrayMesh_jjgbg")
 
 [node name="ReferenceMeshInstance3D" type="MeshInstance3D" parent="." unique_id=630849522]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.67357004, 0, -3.9253254)

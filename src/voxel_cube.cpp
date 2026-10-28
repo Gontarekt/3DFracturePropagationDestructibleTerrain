@@ -96,9 +96,13 @@ void VoxelCube::_ready()
         surface_array[(int)Mesh::ArrayType::ARRAY_NORMAL] = normals;
         surface_array[(int)Mesh::ArrayType::ARRAY_INDEX] = indices;
 
-        Ref<ArrayMesh> mesh = mesh_node->get_mesh();
-        //mesh->add_surface_from_arrays(Mesh::PrimitiveType::PRIMITIVE_TRIANGLE_STRIP, surface_array);
-        mesh->add_surface_from_arrays(Mesh::PrimitiveType::PRIMITIVE_TRIANGLES, surface_array);
+        //Ref<ArrayMesh> mesh = mesh_node->get_mesh(); // This works but is unsafe, crashes if mesh is not an ArrayMesh.
+        Ref<Mesh> mesh = mesh_node->get_mesh();
+        if(ArrayMesh* array_mesh = Object::cast_to<ArrayMesh>(mesh.ptr()))
+        {
+            array_mesh->add_surface_from_arrays(Mesh::PrimitiveType::PRIMITIVE_TRIANGLES, surface_array);
+            //array_mesh->add_surface_from_arrays(Mesh::PrimitiveType::PRIMITIVE_TRIANGLE_STRIP, surface_array);
+        }
     }
     if (voxels) {
         UtilityFunctions::print("Voxel array size: ", ((num_voxels) / sizeof(uint8_t)));

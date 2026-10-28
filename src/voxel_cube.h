@@ -1,3 +1,8 @@
+/*
+ * Meshinstance3D must be added as a child with an 'ArrayMesh' type mesh attached.
+ *
+ */
+
 #pragma once
 
 #include <godot_cpp/classes/node3d.hpp>
