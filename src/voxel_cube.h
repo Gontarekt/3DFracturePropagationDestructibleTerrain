@@ -1,6 +1,14 @@
 /*
  * Meshinstance3D must be added as a child with an 'ArrayMesh' type mesh attached.
  *
+ * NOTE: Godot has a clockwise rendering order
+ *
+ * TODO:
+ * Make a function for mesh generation
+ * - Example Mesh Generation Triangle Strip Face
+ * - Example Mesh Generation Triangle List Face
+ * - Naive Voxel Mesh Generation
+ *
  */
 
 #pragma once
