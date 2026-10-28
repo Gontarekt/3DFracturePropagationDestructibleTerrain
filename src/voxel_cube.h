@@ -5,8 +5,6 @@
  *
  * TODO:
  * Make a function for mesh generation
- * - Example Mesh Generation Triangle Strip Face
- * - Example Mesh Generation Triangle List Face
  * - Naive Voxel Mesh Generation
  *
  */
@@ -40,6 +38,10 @@ public:
 
 	void set_size(const Vector3i new_size);
 	Vector3i get_size() const { return size; }
+
+	// Example Functions for helping understanding of godots rendering + procedural mesh generation
+	void generate_triangle_strip_face();
+	void generate_triangle_list_face();
 };
 
 } // namespace godot

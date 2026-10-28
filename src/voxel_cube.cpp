@@ -37,78 +37,8 @@ void VoxelCube::_ready()
     if (mesh_node) {
         /// Procedurally generate voxel mesh from voxel grid
 
-        std::vector<Vector3> vertices_vector;
-        std::vector<Vector2> uvs_vector;
-        std::vector<Vector3> normals_vector;
-        std::vector<int32_t> indices_vector;
-        PackedVector3Array vertices;
-        PackedVector2Array uvs;
-        PackedVector3Array normals;
-        PackedInt32Array indices;
-
-        vertices_vector.push_back(Vector3(0,0,0));
-        vertices_vector.push_back(Vector3(1,0,0));
-        vertices_vector.push_back(Vector3(0,0,1));
-        vertices_vector.push_back(Vector3(1,0,1));
-        vertices.resize(vertices_vector.size());
-        for (int i = 0; i < vertices_vector.size(); i ++)
-        {
-            vertices.set(i, vertices_vector[i]);
-        }
-
-        uvs_vector.push_back(Vector2(0,0));
-        uvs_vector.push_back(Vector2(1,0));
-        uvs_vector.push_back(Vector2(0,1));
-        uvs_vector.push_back(Vector2(1,1));
-        uvs.resize(uvs_vector.size());
-        for (int i = 0; i < uvs_vector.size(); i ++)
-        {
-            uvs.set(i, uvs_vector[i]);
-        }
-
-        normals_vector.push_back(Vector3(0,1,0));
-        normals_vector.push_back(Vector3(0,1,0));
-        normals_vector.push_back(Vector3(0,1,0));
-        normals_vector.push_back(Vector3(0,1,0));
-        normals.resize(normals_vector.size());
-        for (int i = 0; i < normals_vector.size(); i ++)
-        {
-            normals.set(i, normals_vector[i]);
-        }
-
-        // Triangle Strip (If vertices are ordered correctly, then indices aren't needed!)
-        // indices_vector.push_back(0);
-        // indices_vector.push_back(2);
-        // indices_vector.push_back(1);
-        // indices_vector.push_back(3);
-        //
-        // Triangle List
-        // indices_vector.push_back(0);
-        // indices_vector.push_back(1);
-        // indices_vector.push_back(2);
-        // indices_vector.push_back(1);
-        // indices_vector.push_back(3);
-        // indices_vector.push_back(2);
-        // indices.resize(indices_vector.size());
-        // for (int i = 0; i < indices_vector.size(); i ++)
-        // {
-        //     indices.set(i, indices_vector[i]);
-        // }
-
-        Array surface_array;
-        surface_array.resize(Mesh::ArrayType::ARRAY_MAX);
-        surface_array[(int)Mesh::ArrayType::ARRAY_VERTEX] = vertices;
-        surface_array[(int)Mesh::ArrayType::ARRAY_TEX_UV] = uvs;
-        surface_array[(int)Mesh::ArrayType::ARRAY_NORMAL] = normals;
-        //surface_array[(int)Mesh::ArrayType::ARRAY_INDEX] = indices; // Not needed with triangle strip
-
-        //Ref<ArrayMesh> mesh = mesh_node->get_mesh(); // This works but is unsafe, crashes if mesh is not an ArrayMesh.
-        Ref<Mesh> mesh = mesh_node->get_mesh();
-        if(ArrayMesh* array_mesh = Object::cast_to<ArrayMesh>(mesh.ptr()))
-        {
-            //array_mesh->add_surface_from_arrays(Mesh::PrimitiveType::PRIMITIVE_TRIANGLES, surface_array);
-            array_mesh->add_surface_from_arrays(Mesh::PrimitiveType::PRIMITIVE_TRIANGLE_STRIP, surface_array);
-        }
+        generate_triangle_strip_face();
+        //generate_triangle_list_face();
     }
     if (voxels) {
         UtilityFunctions::print("Voxel array size: ", ((num_voxels) / sizeof(uint8_t)));
@@ -135,4 +65,126 @@ void VoxelCube::set_size(const Vector3i new_size)
     size.z = std::max(new_size.z, 1);
     num_voxels = size.x*size.y*size.z;
     voxels = std::make_unique<uint8_t[]>(num_voxels);
+}
+
+void VoxelCube::generate_triangle_strip_face()
+{
+    if (!mesh_node) { return;}
+
+    std::vector<Vector3> vertices_vector;
+    PackedVector3Array vertices;
+    vertices_vector.push_back(Vector3(0,0,0));
+    vertices_vector.push_back(Vector3(1,0,0));
+    vertices_vector.push_back(Vector3(0,0,1));
+    vertices_vector.push_back(Vector3(1,0,1));
+    vertices.resize(vertices_vector.size());
+    for (int i = 0; i < vertices_vector.size(); i ++)
+    {
+        vertices.set(i, vertices_vector[i]);
+    }
+
+    std::vector<Vector2> uvs_vector;
+    PackedVector2Array uvs;
+    uvs_vector.push_back(Vector2(0,0));
+    uvs_vector.push_back(Vector2(1,0));
+    uvs_vector.push_back(Vector2(0,1));
+    uvs_vector.push_back(Vector2(1,1));
+    uvs.resize(uvs_vector.size());
+    for (int i = 0; i < uvs_vector.size(); i ++)
+    {
+        uvs.set(i, uvs_vector[i]);
+    }
+
+    std::vector<Vector3> normals_vector;
+    PackedVector3Array normals;
+    normals_vector.push_back(Vector3(0,1,0));
+    normals_vector.push_back(Vector3(0,1,0));
+    normals_vector.push_back(Vector3(0,1,0));
+    normals_vector.push_back(Vector3(0,1,0));
+    normals.resize(normals_vector.size());
+    for (int i = 0; i < normals_vector.size(); i ++)
+    {
+        normals.set(i, normals_vector[i]);
+    }
+
+    Array surface_array;
+    surface_array.resize(Mesh::ArrayType::ARRAY_MAX);
+    surface_array[(int)Mesh::ArrayType::ARRAY_VERTEX] = vertices;
+    surface_array[(int)Mesh::ArrayType::ARRAY_TEX_UV] = uvs;
+    surface_array[(int)Mesh::ArrayType::ARRAY_NORMAL] = normals;
+
+    Ref<Mesh> mesh = mesh_node->get_mesh();
+    if(ArrayMesh* array_mesh = Object::cast_to<ArrayMesh>(mesh.ptr()))
+    {
+        array_mesh->add_surface_from_arrays(Mesh::PrimitiveType::PRIMITIVE_TRIANGLE_STRIP, surface_array);
+    }
+}
+
+void VoxelCube::generate_triangle_list_face()
+{
+     if (!mesh_node) { return;}
+
+     std::vector<Vector3> vertices_vector;
+     PackedVector3Array vertices;
+     vertices_vector.push_back(Vector3(0,0,0));
+     vertices_vector.push_back(Vector3(1,0,0));
+     vertices_vector.push_back(Vector3(0,0,1));
+     vertices_vector.push_back(Vector3(1,0,1));
+     vertices.resize(vertices_vector.size());
+     for (int i = 0; i < vertices_vector.size(); i ++)
+     {
+         vertices.set(i, vertices_vector[i]);
+     }
+
+     std::vector<Vector2> uvs_vector;
+     PackedVector2Array uvs;
+     uvs_vector.push_back(Vector2(0,0));
+     uvs_vector.push_back(Vector2(1,0));
+     uvs_vector.push_back(Vector2(0,1));
+     uvs_vector.push_back(Vector2(1,1));
+     uvs.resize(uvs_vector.size());
+     for (int i = 0; i < uvs_vector.size(); i ++)
+     {
+         uvs.set(i, uvs_vector[i]);
+     }
+
+     std::vector<Vector3> normals_vector;
+     PackedVector3Array normals;
+     normals_vector.push_back(Vector3(0,1,0));
+     normals_vector.push_back(Vector3(0,1,0));
+     normals_vector.push_back(Vector3(0,1,0));
+     normals_vector.push_back(Vector3(0,1,0));
+     normals.resize(normals_vector.size());
+     for (int i = 0; i < normals_vector.size(); i ++)
+     {
+         normals.set(i, normals_vector[i]);
+     }
+
+     std::vector<int32_t> indices_vector;
+     PackedInt32Array indices;
+     indices_vector.push_back(0);
+     indices_vector.push_back(1);
+     indices_vector.push_back(2);
+     indices_vector.push_back(1);
+     indices_vector.push_back(3);
+     indices_vector.push_back(2);
+     indices.resize(indices_vector.size());
+     for (int i = 0; i < indices_vector.size(); i ++)
+     {
+         indices.set(i, indices_vector[i]);
+     }
+
+     Array surface_array;
+     surface_array.resize(Mesh::ArrayType::ARRAY_MAX);
+     surface_array[(int)Mesh::ArrayType::ARRAY_VERTEX] = vertices;
+     surface_array[(int)Mesh::ArrayType::ARRAY_TEX_UV] = uvs;
+     surface_array[(int)Mesh::ArrayType::ARRAY_NORMAL] = normals;
+     surface_array[(int)Mesh::ArrayType::ARRAY_INDEX] = indices; // Not needed with triangle strip
+
+     //Ref<ArrayMesh> mesh = mesh_node->get_mesh(); // This works but is unsafe, crashes if mesh is not an ArrayMesh.
+     Ref<Mesh> mesh = mesh_node->get_mesh();
+     if(ArrayMesh* array_mesh = Object::cast_to<ArrayMesh>(mesh.ptr()))
+     {
+         array_mesh->add_surface_from_arrays(Mesh::PrimitiveType::PRIMITIVE_TRIANGLES, surface_array);
+     }
 }
