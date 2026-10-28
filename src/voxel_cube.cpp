@@ -5,6 +5,7 @@
 #include <godot_cpp/core/defs.hpp>
 #include <memory>
 #include <vector>
+#include <chrono>
 
 using namespace godot;
 
@@ -28,6 +29,8 @@ VoxelCube::~VoxelCube()
 
 void VoxelCube::_ready()
 {
+    std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
+
     // Generate the voxel array
     voxels = std::make_unique<uint8_t[]>(num_voxels);
     mesh_node = dynamic_cast<MeshInstance3D*>(get_child(0));
@@ -107,6 +110,11 @@ void VoxelCube::_ready()
     if (voxels) {
         UtilityFunctions::print("Voxel array size: ", ((num_voxels) / sizeof(uint8_t)));
     }
+
+    std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
+
+    double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+    UtilityFunctions::print("VoxelCube _ready() took ", elapsed_time, " ms");
 }
 
 void VoxelCube::_process(double delta)
