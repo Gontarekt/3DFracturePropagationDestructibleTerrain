@@ -15,7 +15,7 @@
     "**/Thumbs.db",
     "**/.classpath",
     "**/.settings",
-    "**/godot-cpp",
+    //"**/godot-cpp",
     "**/.cache",
     "**.obj",
     "**.exp",

@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://glse1j56y8hn"]
+
+[ext_resource type="Texture2D" uid="uid://brhwert6v4ovn" path="res://Assets/icon.svg" id="1_o220b"]
+
+[node name="ExampleScene" type="Node2D" unique_id=2138326554]
+
+[node name="GDExample" type="GDExample" parent="." unique_id=2052989127]
+amplitude = 60.0
+speed = 4.3
+position = Vector2(330, 198)
+texture = ExtResource("1_o220b")

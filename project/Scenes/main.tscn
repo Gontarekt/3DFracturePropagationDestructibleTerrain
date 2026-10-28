@@ -1,0 +1,35 @@
+[gd_scene format=3 uid="uid://dgxfmwpchm8py"]
+
+[ext_resource type="Script" uid="uid://bnvuiih1fy07b" path="res://Scripts/camera.gd" id="1_jjgbg"]
+
+[sub_resource type="Environment" id="Environment_7dm0k"]
+ambient_light_color = Color(1, 1, 1, 1)
+ambient_light_energy = 2.85
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_7dm0k"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_7dm0k"]
+
+[node name="Node3D" type="Node3D" unique_id=845366058]
+
+[node name="Core" type="Node3D" parent="." unique_id=477913743]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="Core" unique_id=30743753]
+transform = Transform3D(0.873925, -0.24267036, 0.42114878, 0, 0.8664527, 0.4992592, -0.48606086, -0.4363151, 0.75721467, 0, 0, 0)
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="Core" unique_id=380380636]
+environment = SubResource("Environment_7dm0k")
+
+[node name="Camera3D" type="Camera3D" parent="Core" unique_id=216101016]
+transform = Transform3D(1, 0, 0, 0, 0.9416293, 0.33665156, 0, -0.33665156, 0.9416293, 0, 1.714189, 1.998418)
+script = ExtResource("1_jjgbg")
+
+[node name="VoxelCube" type="VoxelCube" parent="." unique_id=700482619]
+size = Vector3i(7, 6, 2)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="VoxelCube" unique_id=27774150]
+mesh = SubResource("ArrayMesh_7dm0k")
+
+[node name="ReferenceMeshInstance3D" type="MeshInstance3D" parent="." unique_id=630849522]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.67357004, 0, -3.9253254)
+mesh = SubResource("BoxMesh_7dm0k")
