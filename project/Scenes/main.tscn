@@ -27,7 +27,6 @@ script = ExtResource("1_jjgbg")
 [node name="VoxelCube" type="VoxelCube" parent="." unique_id=700482619]
 size = Vector3i(7, 6, 2)
 num_tests_to_run = 10000
-use_triangle_strip_topology = true
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="VoxelCube" unique_id=27774150]
 mesh = SubResource("ArrayMesh_jjgbg")

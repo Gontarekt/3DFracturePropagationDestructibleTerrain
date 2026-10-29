@@ -6,6 +6,7 @@
  * TODO:
  * Make a function for mesh generation
  * - Naive Voxel Mesh Generation
+ * Possibly have enum for type of mesh generation (Simple quad test, naive voxel mesh, etc)
  *
  */
 
@@ -15,6 +16,13 @@
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/classes/mesh_instance3d.hpp>
 #include <vector>
+
+enum MeshGenerationType {
+    triangle_strip_quad,
+    triangle_list_quad,
+    culling_voxel_mesh
+};
+VARIANT_ENUM_CAST(MeshGenerationType);
 
 namespace godot {
 
@@ -29,7 +37,7 @@ private:
 	int num_tests_to_run;
 	bool mesh_needs_generated;
 	std::vector<double> timings;
-	bool use_triangle_strip_topology;
+	MeshGenerationType mesh_generation_type;
 
 protected:
 	static void _bind_methods();
@@ -44,16 +52,17 @@ public:
 	void set_num_tests_to_run(const int new_num_tests_to_run);
 	int get_num_tests_to_run() const { return num_tests_to_run; }
 
-	void set_use_triangle_strip_topology(const int new_use_triangle_strip_topology) { use_triangle_strip_topology = new_use_triangle_strip_topology;};
-	int get_use_triangle_strip_topology() const { return use_triangle_strip_topology; }
+	void set_mesh_generation_type(const MeshGenerationType new_mesh_generation_type) { mesh_generation_type = new_mesh_generation_type;};
+	MeshGenerationType get_mesh_generation_type() const { return mesh_generation_type; }
 
 	void set_size(const Vector3i new_size);
 	Vector3i get_size() const { return size; }
 
 	// Example Functions for helping understanding of godots rendering + procedural mesh generation
 	void generate_mesh();
-	void generate_triangle_strip_face();
-	void generate_triangle_list_face();
+	void generate_triangle_strip_quad(); // Test function
+	void generate_triangle_list_quad(); // Test function
+	void generate_voxel_mesh();
 };
 
 } // namespace godot

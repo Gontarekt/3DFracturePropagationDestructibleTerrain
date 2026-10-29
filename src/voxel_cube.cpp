@@ -16,18 +16,16 @@ void VoxelCube::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3I, "size"), "set_size", "get_size");
 
 	ClassDB::bind_method(D_METHOD("get_num_tests_to_run"), &VoxelCube::get_num_tests_to_run);
-	// Ideally I have a way to make the godot property always have a value of 1 or greater.
 	ClassDB::bind_method(D_METHOD("set_num_tests_to_run", "new_num_tests_to_run"), &VoxelCube::set_num_tests_to_run);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "num_tests_to_run"), "set_num_tests_to_run", "get_num_tests_to_run");
 
-	ClassDB::bind_method(D_METHOD("get_use_triangle_strip_topology"), &VoxelCube::get_use_triangle_strip_topology);
-	// Ideally I have a way to make the godot property always have a value of 1 or greater.
-	ClassDB::bind_method(D_METHOD("set_use_triangle_strip_topology", "new_use_triangle_strip_topology"), &VoxelCube::set_use_triangle_strip_topology);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_triangle_strip_topology"), "set_use_triangle_strip_topology", "get_use_triangle_strip_topology");
+	ClassDB::bind_method(D_METHOD("get_mesh_generation_type"), &VoxelCube::get_mesh_generation_type);
+	ClassDB::bind_method(D_METHOD("set_mesh_generation_type", "new_mesh_generation_type"), &VoxelCube::set_mesh_generation_type);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "mesh_generation_type", PROPERTY_HINT_ENUM, "Triangle Strip Quad,Triangle List Quad,Culling Voxel Mesh"), "set_mesh_generation_type", "get_mesh_generation_type");
 }
 
 VoxelCube::VoxelCube() : size(Vector3i(1,1,1)), mesh_node(nullptr), num_voxels(1),
-num_tests_to_run(1), mesh_needs_generated(true), use_triangle_strip_topology(true)
+num_tests_to_run(1), mesh_needs_generated(true), mesh_generation_type(MeshGenerationType::culling_voxel_mesh)
 {
 
 }
@@ -63,7 +61,7 @@ void VoxelCube::set_size(const Vector3i new_size)
     voxels = std::make_unique<uint8_t[]>(num_voxels);
 }
 
-void VoxelCube::generate_triangle_strip_face()
+void VoxelCube::generate_triangle_strip_quad()
 {
     if (!mesh_node) { return;}
 
@@ -120,7 +118,7 @@ void VoxelCube::generate_triangle_strip_face()
     }
 }
 
-void VoxelCube::generate_triangle_list_face()
+void VoxelCube::generate_triangle_list_quad()
 {
      if (!mesh_node) { return;}
 
@@ -210,11 +208,15 @@ void VoxelCube::generate_mesh()
     for (int i = 0; i < num_tests_to_run; i++)
     {
         std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
-        if (use_triangle_strip_topology){
-            generate_triangle_strip_face();
+        if (mesh_generation_type == MeshGenerationType::triangle_strip_quad){
+            generate_triangle_strip_quad();
         }
-        else {
-            generate_triangle_list_face();
+        else if (mesh_generation_type == MeshGenerationType::triangle_list_quad){
+            generate_triangle_list_quad();
+        }
+        else if (mesh_generation_type == MeshGenerationType::culling_voxel_mesh)
+        {
+            generate_mesh();
         }
         std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
         double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
@@ -234,4 +236,71 @@ void VoxelCube::generate_mesh()
     UtilityFunctions::print("VoxelCube mesh generation took an average of ", average_time, " ms");
 
     mesh_needs_generated = false;
+}
+
+void VoxelCube::generate_voxel_mesh()
+{
+    if (!mesh_node) { return;}
+
+    //// VERTICES
+
+    std::vector<Vector3> vertices_vector;
+    PackedVector3Array vertices;
+    // std::vector<Vector2> uvs_vector;
+    // PackedVector2Array uvs;
+    std::vector<Vector3> normals_vector;
+    PackedVector3Array normals;
+
+    /// Generate vertices per voxel
+
+    // for (int x = 0; x < size.x; x++)
+    // {
+    //     for (int y = 0; y < size.y; y++)
+    //     {
+    //         for (int z = 0; z < size.x; z++)
+    //         {
+
+    //         }
+    //     }
+    // }
+
+    // vertices_vector.push_back(Vector3(0,0,0));
+    // vertices_vector.push_back(Vector3(1,0,0));
+    // vertices_vector.push_back(Vector3(0,0,1));
+    // vertices_vector.push_back(Vector3(1,0,1));
+
+    /// Pack data into arrays
+
+    vertices.resize(vertices_vector.size());
+    for (int i = 0; i < vertices_vector.size(); i ++)
+    {
+        vertices.set(i, vertices_vector[i]);
+    }
+    // uvs.resize(uvs_vector.size());
+    // for (int i = 0; i < uvs_vector.size(); i ++)
+    // {
+    //     uvs.set(i, uvs_vector[i]);
+    // }
+    normals.resize(normals_vector.size());
+    for (int i = 0; i < normals_vector.size(); i ++)
+    {
+        normals.set(i, normals_vector[i]);
+    }
+
+    /// Create surface array from generated mesh data
+
+    Array surface_array;
+    surface_array.resize(Mesh::ArrayType::ARRAY_MAX);
+    surface_array[(int)Mesh::ArrayType::ARRAY_VERTEX] = vertices;
+    //surface_array[(int)Mesh::ArrayType::ARRAY_TEX_UV] = uvs;
+    surface_array[(int)Mesh::ArrayType::ARRAY_NORMAL] = normals;
+
+    /// Create mesh from Surface Array
+
+    Ref<Mesh> mesh = mesh_node->get_mesh();
+    if(ArrayMesh* array_mesh = Object::cast_to<ArrayMesh>(mesh.ptr()))
+    {
+        array_mesh->clear_surfaces();
+        array_mesh->add_surface_from_arrays(Mesh::PrimitiveType::PRIMITIVE_TRIANGLE_STRIP, surface_array);
+    }
 }
