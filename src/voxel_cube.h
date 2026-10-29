@@ -7,7 +7,7 @@
  * Make a function for mesh generation
  * - Naive Voxel Mesh Generation
  * Possibly have enum for type of mesh generation (Simple quad test, naive voxel mesh, etc)
- *
+ * Fix naming convention (prefix with _ for private variables)
  */
 
 #pragma once
@@ -16,6 +16,7 @@
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/classes/mesh_instance3d.hpp>
 #include <vector>
+#include "voxel_utility.h"
 
 enum MeshGenerationType {
     triangle_strip_quad,
@@ -32,7 +33,8 @@ class VoxelCube : public Node3D {
 private:
 	Vector3i size;
 	int num_voxels; // Computed from size
-	std::unique_ptr<uint8_t[]> voxels;
+	// Represent voxels with a simple integer value, 0 means no voxel, index calculated via helper functions to convert 3D to 1D array.
+	std::unique_ptr<std::vector<uint8_t>> voxels;
 	MeshInstance3D* mesh_node;
 	int num_tests_to_run;
 	bool mesh_needs_generated;

@@ -38,12 +38,13 @@ VoxelCube::~VoxelCube()
 void VoxelCube::_ready()
 {
     // Generate the voxel array
-    voxels = std::make_unique<uint8_t[]>(num_voxels);
-    mesh_node = dynamic_cast<MeshInstance3D*>(get_child(0));
-    //generate_mesh();
+    num_voxels = size.x*size.y*size.z;
+    voxels = std::make_unique<std::vector<uint8_t>>(num_voxels, 1);
     if (voxels) {
-        UtilityFunctions::print("Voxel array size: ", ((num_voxels) / sizeof(uint8_t)));
+        UtilityFunctions::print("Voxel array size: ", voxels->size());
     }
+
+    mesh_node = dynamic_cast<MeshInstance3D*>(get_child(0));
 }
 
 void VoxelCube::_process(double delta)
@@ -58,7 +59,8 @@ void VoxelCube::set_size(const Vector3i new_size)
     size.y = std::max(new_size.y, 1);
     size.z = std::max(new_size.z, 1);
     num_voxels = size.x*size.y*size.z;
-    voxels = std::make_unique<uint8_t[]>(num_voxels);
+    voxels = std::make_unique<std::vector<uint8_t>>(num_voxels, 1);
+    mesh_needs_generated = true;
 }
 
 void VoxelCube::generate_triangle_strip_quad()
@@ -216,7 +218,7 @@ void VoxelCube::generate_mesh()
         }
         else if (mesh_generation_type == MeshGenerationType::culling_voxel_mesh)
         {
-            generate_mesh();
+            generate_voxel_mesh();
         }
         std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
         double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
@@ -246,28 +248,67 @@ void VoxelCube::generate_voxel_mesh()
 
     std::vector<Vector3> vertices_vector;
     PackedVector3Array vertices;
-    // std::vector<Vector2> uvs_vector;
-    // PackedVector2Array uvs;
+    std::vector<int32_t> indices_vector;
+    PackedInt32Array indices;
     std::vector<Vector3> normals_vector;
     PackedVector3Array normals;
+    // std::vector<Vector2> uvs_vector;
+    // PackedVector2Array uvs;
 
     /// Generate vertices per voxel
 
-    // for (int x = 0; x < size.x; x++)
-    // {
-    //     for (int y = 0; y < size.y; y++)
-    //     {
-    //         for (int z = 0; z < size.x; z++)
-    //         {
+    for (int x = 0; x < size.x; x++)
+    {
+        for (int y = 0; y < size.y; y++)
+        {
+            for (int z = 0; z < size.z; z++)
+            {
+                // Ignore empty voxels
+                int index = VoxelUtility::voxel_index_from_position(size.x, size.y, x, y, z);
+                int vertex_offset = vertices_vector.size();
+                if (voxels->at(index) == 0) { continue; }
 
-    //         }
-    //     }
-    // }
+                //// Render voxel faces
+                // Only render faces if the voxel adjacent to that face is empty, otherwise do not draw it (cull the face).
 
-    // vertices_vector.push_back(Vector3(0,0,0));
-    // vertices_vector.push_back(Vector3(1,0,0));
-    // vertices_vector.push_back(Vector3(0,0,1));
-    // vertices_vector.push_back(Vector3(1,0,1));
+                /// TOP FACE
+
+                int index_above_voxel = -1;
+                if (y+1 < size.y) { index_above_voxel = VoxelUtility::voxel_index_from_position(size.x, size.y, x, y+1, z); };
+                if (index_above_voxel == -1 || voxels->at(index_above_voxel) == 0)
+                {
+                    vertices_vector.push_back(Vector3(-0.5 + x, 0.5 + y, -0.5 + z));
+                    vertices_vector.push_back(Vector3(0.5 + x, 0.5 + y, -0.5 + z));
+                    vertices_vector.push_back(Vector3(-0.5 + x, 0.5 + y, 0.5 + z));
+                    vertices_vector.push_back(Vector3(0.5 + x, 0.5 + y, 0.5 + z));
+
+                    indices_vector.push_back(0 + vertex_offset);
+                    indices_vector.push_back(1 + vertex_offset);
+                    indices_vector.push_back(2 + vertex_offset);
+                    indices_vector.push_back(1 + vertex_offset);
+                    indices_vector.push_back(3 + vertex_offset);
+                    indices_vector.push_back(2 + vertex_offset);
+
+                    normals_vector.push_back(Vector3(0, 1,  0));
+                    normals_vector.push_back(Vector3(0, 1,  0));
+                    normals_vector.push_back(Vector3(0, 1,  0));
+                    normals_vector.push_back(Vector3(0, 1,  0));
+                }
+            }
+        }
+    }
+
+    // // TOP FACE
+
+    // vertices_vector.push_back(Vector3(0,    0.5,  0));
+    // vertices_vector.push_back(Vector3(0.5,  0.5,  0));
+    // vertices_vector.push_back(Vector3(0,    0.5,  0.5));
+    // vertices_vector.push_back(Vector3(0.5,  0.5,  0.5));
+
+    // normals_vector.push_back(Vector3(0, 1,  0));
+    // normals_vector.push_back(Vector3(0, 1,  0));
+    // normals_vector.push_back(Vector3(0, 1,  0));
+    // normals_vector.push_back(Vector3(0, 1,  0));
 
     /// Pack data into arrays
 
@@ -276,24 +317,30 @@ void VoxelCube::generate_voxel_mesh()
     {
         vertices.set(i, vertices_vector[i]);
     }
-    // uvs.resize(uvs_vector.size());
-    // for (int i = 0; i < uvs_vector.size(); i ++)
-    // {
-    //     uvs.set(i, uvs_vector[i]);
-    // }
+    indices.resize(indices_vector.size());
+    for (int i = 0; i < indices_vector.size(); i ++)
+    {
+        indices.set(i, indices_vector[i]);
+    }
     normals.resize(normals_vector.size());
     for (int i = 0; i < normals_vector.size(); i ++)
     {
         normals.set(i, normals_vector[i]);
     }
+    // uvs.resize(uvs_vector.size());
+    // for (int i = 0; i < uvs_vector.size(); i ++)
+    // {
+    //     uvs.set(i, uvs_vector[i]);
+    // }
 
     /// Create surface array from generated mesh data
 
     Array surface_array;
     surface_array.resize(Mesh::ArrayType::ARRAY_MAX);
     surface_array[(int)Mesh::ArrayType::ARRAY_VERTEX] = vertices;
-    //surface_array[(int)Mesh::ArrayType::ARRAY_TEX_UV] = uvs;
+    surface_array[(int)Mesh::ArrayType::ARRAY_INDEX] = indices;
     surface_array[(int)Mesh::ArrayType::ARRAY_NORMAL] = normals;
+    //surface_array[(int)Mesh::ArrayType::ARRAY_TEX_UV] = uvs;
 
     /// Create mesh from Surface Array
 
@@ -301,6 +348,6 @@ void VoxelCube::generate_voxel_mesh()
     if(ArrayMesh* array_mesh = Object::cast_to<ArrayMesh>(mesh.ptr()))
     {
         array_mesh->clear_surfaces();
-        array_mesh->add_surface_from_arrays(Mesh::PrimitiveType::PRIMITIVE_TRIANGLE_STRIP, surface_array);
+        array_mesh->add_surface_from_arrays(Mesh::PrimitiveType::PRIMITIVE_TRIANGLES, surface_array);
     }
 }
