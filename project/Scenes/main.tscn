@@ -25,11 +25,11 @@ transform = Transform3D(1, 0, 0, 0, 0.9416293, 0.33665156, 0, -0.33665156, 0.941
 script = ExtResource("1_jjgbg")
 
 [node name="VoxelCube" type="VoxelCube" parent="." unique_id=700482619]
-size = Vector3i(2, 1, 1)
+size = Vector3i(6, 4, 5)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="VoxelCube" unique_id=27774150]
 mesh = SubResource("ArrayMesh_jjgbg")
 
 [node name="ReferenceMeshInstance3D" type="MeshInstance3D" parent="." unique_id=630849522]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.67357004, 0, -3.9253254)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.67357004, 0.17655325, -3.9253254)
 mesh = SubResource("BoxMesh_7dm0k")

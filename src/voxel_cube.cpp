@@ -252,63 +252,147 @@ void VoxelCube::generate_voxel_mesh()
     PackedInt32Array indices;
     std::vector<Vector3> normals_vector;
     PackedVector3Array normals;
+    // std::vector<Color> colours_vector;
+    // PackedColorArray colours;
     // std::vector<Vector2> uvs_vector;
     // PackedVector2Array uvs;
 
     /// Generate vertices per voxel
 
+    int vertex_offset = 0;
     for (int x = 0; x < size.x; x++)
     {
         for (int y = 0; y < size.y; y++)
         {
             for (int z = 0; z < size.z; z++)
             {
-                // Ignore empty voxels
-                int index = VoxelUtility::voxel_index_from_position(size.x, size.y, x, y, z);
-                int vertex_offset = vertices_vector.size();
+                /// Ignore empty voxels
+
+                int index = VoxelUtility::voxel_index_from_position(size.x, size.y, Vector3(x,y,z));
                 if (voxels->at(index) == 0) { continue; }
 
                 //// Render voxel faces
                 // Only render faces if the voxel adjacent to that face is empty, otherwise do not draw it (cull the face).
 
+                /// Construct vertex positions (there are 8)
+                // All faces drawn in Z shape, starting from top left.
+                // x -+: left-right
+                // y -+: bottom-top
+                // z -+: front-back
+
+                const Vector3 back_top_left = Vector3(-0.5 + x, 0.5 + y, 0.5 + z);
+                const Vector3 back_top_right = Vector3(0.5 + x, 0.5 + y, 0.5 + z);
+                const Vector3 back_bottom_left = Vector3(-0.5 + x, -0.5 + y, 0.5 + z);
+                const Vector3 back_bottom_right = Vector3(0.5 + x, -0.5 + y, 0.5 + z);
+                const Vector3 front_top_left = Vector3(-0.5 + x, 0.5 + y, -0.5 + z);
+                const Vector3 front_top_right = Vector3(0.5 + x, 0.5 + y, -0.5 + z);
+                const Vector3 front_bottom_left = Vector3(-0.5 + x, -0.5 + y, -0.5 + z);
+                const Vector3 front_bottom_right = Vector3(0.5 + x, -0.5 + y, -0.5 + z);
+
                 /// TOP FACE
 
-                int index_above_voxel = -1;
-                if (y+1 < size.y) { index_above_voxel = VoxelUtility::voxel_index_from_position(size.x, size.y, x, y+1, z); };
-                if (index_above_voxel == -1 || voxels->at(index_above_voxel) == 0)
+                int index_adjacent_voxel = -1;
+                if (y+1 < size.y) { index_adjacent_voxel = VoxelUtility::voxel_index_from_position(size.x, size.y, Vector3(x,y + 1,z)); };
+                if (index_adjacent_voxel == -1 || voxels->at(index_adjacent_voxel) == 0)
                 {
-                    vertices_vector.push_back(Vector3(-0.5 + x, 0.5 + y, -0.5 + z));
-                    vertices_vector.push_back(Vector3(0.5 + x, 0.5 + y, -0.5 + z));
-                    vertices_vector.push_back(Vector3(-0.5 + x, 0.5 + y, 0.5 + z));
-                    vertices_vector.push_back(Vector3(0.5 + x, 0.5 + y, 0.5 + z));
+                    vertices_vector.push_back(front_top_left);
+                    vertices_vector.push_back(front_top_right);
+                    vertices_vector.push_back(back_top_left);
+                    vertices_vector.push_back(back_top_right);
 
-                    indices_vector.push_back(0 + vertex_offset);
-                    indices_vector.push_back(1 + vertex_offset);
-                    indices_vector.push_back(2 + vertex_offset);
-                    indices_vector.push_back(1 + vertex_offset);
-                    indices_vector.push_back(3 + vertex_offset);
-                    indices_vector.push_back(2 + vertex_offset);
+                    VoxelUtility::generate_indices_for_quad(indices_vector, vertex_offset);
+                    VoxelUtility::generate_normals_for_quad(normals_vector, VoxelUtility::UP);
 
-                    normals_vector.push_back(Vector3(0, 1,  0));
-                    normals_vector.push_back(Vector3(0, 1,  0));
-                    normals_vector.push_back(Vector3(0, 1,  0));
-                    normals_vector.push_back(Vector3(0, 1,  0));
+                    vertex_offset += 4;
+                }
+
+                /// BOTTOM FACE
+
+                index_adjacent_voxel = -1;
+                if (y-1 >= 0) { index_adjacent_voxel = VoxelUtility::voxel_index_from_position(size.x, size.y, Vector3(x,y - 1, z)); };
+                if (index_adjacent_voxel == -1 || voxels->at(index_adjacent_voxel) == 0)
+                {
+                    vertices_vector.push_back(back_bottom_left);
+                    vertices_vector.push_back(back_bottom_right);
+                    vertices_vector.push_back(front_bottom_left);
+                    vertices_vector.push_back(front_bottom_right);
+
+                    VoxelUtility::generate_indices_for_quad(indices_vector, vertex_offset);
+                    VoxelUtility::generate_normals_for_quad(normals_vector, VoxelUtility::DOWN);
+
+                    vertex_offset += 4;
+                }
+
+                /// LEFT FACE
+
+                index_adjacent_voxel = -1;
+                if (x-1 >= 0) { index_adjacent_voxel = VoxelUtility::voxel_index_from_position(size.x, size.y, Vector3(x-1,y,z)); };
+                if (index_adjacent_voxel == -1 || voxels->at(index_adjacent_voxel) == 0)
+                {
+                    vertices_vector.push_back(front_top_left);
+                    vertices_vector.push_back(back_top_left);
+                    vertices_vector.push_back(front_bottom_left);
+                    vertices_vector.push_back(back_bottom_left);
+
+                    VoxelUtility::generate_indices_for_quad(indices_vector, vertex_offset);
+                    VoxelUtility::generate_normals_for_quad(normals_vector, VoxelUtility::LEFT);
+
+                    vertex_offset += 4;
+                }
+
+                /// RIGHT FACE
+
+                index_adjacent_voxel = -1;
+                if (x+1 < size.x) { index_adjacent_voxel = VoxelUtility::voxel_index_from_position(size.x, size.y, Vector3(x+1,y,z)); };
+                if (index_adjacent_voxel == -1 || voxels->at(index_adjacent_voxel) == 0)
+                {
+                    vertices_vector.push_back(back_top_right);
+                    vertices_vector.push_back(front_top_right);
+                    vertices_vector.push_back(back_bottom_right);
+                    vertices_vector.push_back(front_bottom_right);
+
+                    VoxelUtility::generate_indices_for_quad(indices_vector, vertex_offset);
+                    VoxelUtility::generate_normals_for_quad(normals_vector, VoxelUtility::RIGHT);
+
+                    vertex_offset += 4;
+                }
+
+                /// FRONT FACE
+
+                index_adjacent_voxel = -1;
+                if (z-1 >= 0) { index_adjacent_voxel = VoxelUtility::voxel_index_from_position(size.x, size.y, Vector3(x,y,z-1)); };
+                if (index_adjacent_voxel == -1 || voxels->at(index_adjacent_voxel) == 0)
+                {
+                    vertices_vector.push_back(front_top_right);
+                    vertices_vector.push_back(front_top_left);
+                    vertices_vector.push_back(front_bottom_right);
+                    vertices_vector.push_back(front_bottom_left);
+
+                    VoxelUtility::generate_indices_for_quad(indices_vector, vertex_offset);
+                    VoxelUtility::generate_normals_for_quad(normals_vector, VoxelUtility::FORWARD);
+
+                    vertex_offset += 4;
+                }
+
+                /// BACK FACE
+
+                index_adjacent_voxel = -1;
+                if (z+1 < size.z) { index_adjacent_voxel = VoxelUtility::voxel_index_from_position(size.x, size.y, Vector3(x,y,z+1)); };
+                if (index_adjacent_voxel == -1 || voxels->at(index_adjacent_voxel) == 0)
+                {
+                    vertices_vector.push_back(back_top_left);
+                    vertices_vector.push_back(back_top_right);
+                    vertices_vector.push_back(back_bottom_left);
+                    vertices_vector.push_back(back_bottom_right);
+
+                    VoxelUtility::generate_indices_for_quad(indices_vector, vertex_offset);
+                    VoxelUtility::generate_normals_for_quad(normals_vector, VoxelUtility::BACKWARD);
+
+                    vertex_offset += 4;
                 }
             }
         }
     }
-
-    // // TOP FACE
-
-    // vertices_vector.push_back(Vector3(0,    0.5,  0));
-    // vertices_vector.push_back(Vector3(0.5,  0.5,  0));
-    // vertices_vector.push_back(Vector3(0,    0.5,  0.5));
-    // vertices_vector.push_back(Vector3(0.5,  0.5,  0.5));
-
-    // normals_vector.push_back(Vector3(0, 1,  0));
-    // normals_vector.push_back(Vector3(0, 1,  0));
-    // normals_vector.push_back(Vector3(0, 1,  0));
-    // normals_vector.push_back(Vector3(0, 1,  0));
 
     /// Pack data into arrays
 
@@ -340,6 +424,7 @@ void VoxelCube::generate_voxel_mesh()
     surface_array[(int)Mesh::ArrayType::ARRAY_VERTEX] = vertices;
     surface_array[(int)Mesh::ArrayType::ARRAY_INDEX] = indices;
     surface_array[(int)Mesh::ArrayType::ARRAY_NORMAL] = normals;
+    //surface_array[(int)Mesh::ArrayType::ARRAY_COLOR] = colours;
     //surface_array[(int)Mesh::ArrayType::ARRAY_TEX_UV] = uvs;
 
     /// Create mesh from Surface Array
