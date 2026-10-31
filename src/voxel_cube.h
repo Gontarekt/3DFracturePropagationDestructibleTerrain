@@ -16,7 +16,6 @@
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/classes/mesh_instance3d.hpp>
 #include <vector>
-#include "voxel_utility.h"
 
 enum MeshGenerationType {
     triangle_strip_quad,

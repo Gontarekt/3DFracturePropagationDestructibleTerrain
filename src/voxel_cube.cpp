@@ -6,6 +6,7 @@
 #include <memory>
 #include <vector>
 #include <chrono>
+#include "voxel_utility.h"
 
 using namespace godot;
 
