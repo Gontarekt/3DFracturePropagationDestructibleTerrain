@@ -9,7 +9,13 @@ ambient_light_energy = 2.85
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_jjgbg"]
 
+[sub_resource type="ArrayMesh" id="ArrayMesh_bo1nx"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bo1nx"]
+albedo_color = Color(1, 0, 1, 1)
+
 [sub_resource type="BoxMesh" id="BoxMesh_7dm0k"]
+material = SubResource("StandardMaterial3D_bo1nx")
 
 [sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_bo1nx"]
 points = PackedVector3Array(0.5, 0.5, 0.5, 0.5, 0.5, -0.5, -0.5, 0.5, 0.5, 0.5, -0.5, 0.5, 0.5, -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, -0.5)
@@ -30,15 +36,19 @@ transform = Transform3D(1, 0, 0, 0, 0.9416293, 0.33665156, 0, -0.33665156, 0.941
 script = ExtResource("1_jjgbg")
 
 [node name="VoxelCube" type="VoxelCube" parent="." unique_id=1294038490]
-size = Vector3i(10, 5, 4)
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.308329, 0, -7.779078)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="VoxelCube" unique_id=27774150]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.8162227, 0, -11.599725)
 mesh = SubResource("ArrayMesh_jjgbg")
 
+[node name="VoxelCube2" type="VoxelCube" parent="." unique_id=1475345895]
+size = Vector3i(5, 3, 6)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.501235, 0, -7.452941)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="VoxelCube2" unique_id=1295143250]
+mesh = SubResource("ArrayMesh_bo1nx")
+
 [node name="ReferenceObject" type="StaticBody3D" parent="." unique_id=39155869]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.4757464, 0.17655325, -3.9253254)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.266645, 0.17655325, -3.9253254)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="ReferenceObject" unique_id=630849522]
 mesh = SubResource("BoxMesh_7dm0k")
