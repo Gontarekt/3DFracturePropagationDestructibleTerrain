@@ -41,8 +41,8 @@ script = ExtResource("1_jjgbg")
 mesh = SubResource("ArrayMesh_jjgbg")
 
 [node name="VoxelCube2" type="VoxelCube" parent="." unique_id=1475345895]
-size = Vector3i(5, 3, 6)
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.501235, 0, -7.452941)
+size = Vector3i(40, 40, 40)
+transform = Transform3D(0.05, 0, 0, 0, 0.05, 0, 0, 0, 0.05, 2.501235, 0, -7.452941)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="VoxelCube2" unique_id=1295143250]
 mesh = SubResource("ArrayMesh_bo1nx")

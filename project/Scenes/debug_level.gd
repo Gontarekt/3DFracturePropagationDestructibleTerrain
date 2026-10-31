@@ -4,6 +4,11 @@ var left_mouse_held: bool = false
 var ray: RayCast3D
 var ray_collided: bool = false
 @onready var camera: Camera3D = $Core/Camera3D
+@export var ray_one_collision_per_cast: bool = true
+
+# Variables that will be passed into fracture propagation start function
+#var impact_force: float = 1.0f
+#var impacted_speed_metres_per_second: float = 1.0f
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
@@ -22,7 +27,8 @@ func _process(_delta: float) -> void:
 		var collided_object = ray.get_collider()
 		var collision_point = ray.get_collision_point()
 		if (collided_object):
-			ray_collided = true
+			if (ray_one_collision_per_cast):
+				ray_collided = true
 			# NOTE: Make sure the MeshInstance3D node is placed at position 0,0,0 of the VoxelCube node.
 			var collision_point_in_local_space: Vector3 = collided_object.to_local(collision_point)
 			#print ("Ray Collision Point: ", "%0.3v" % collision_point);
