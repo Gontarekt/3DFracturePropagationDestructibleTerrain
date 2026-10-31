@@ -7,7 +7,6 @@
 #include <vector>
 #include <chrono>
 #include "voxel_utility.h"
-#include <godot_cpp/classes/collision_shape3d.hpp>
 
 using namespace godot;
 
@@ -24,10 +23,12 @@ void VoxelCube::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_mesh_generation_type"), &VoxelCube::get_mesh_generation_type);
 	ClassDB::bind_method(D_METHOD("set_mesh_generation_type", "new_mesh_generation_type"), &VoxelCube::set_mesh_generation_type);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "mesh_generation_type", PROPERTY_HINT_ENUM, "Triangle Strip Quad,Triangle List Quad,Culling Voxel Mesh"), "set_mesh_generation_type", "get_mesh_generation_type");
+
+	ClassDB::bind_method(D_METHOD("remove_voxel", "voxel_position"), &VoxelCube::remove_voxel);
 }
 
 VoxelCube::VoxelCube() : size(Vector3i(1,1,1)), mesh_node(nullptr), num_voxels(1),
-num_tests_to_run(1), mesh_needs_generated(true), mesh_generation_type(MeshGenerationType::culling_voxel_mesh)
+num_tests_to_run(1), mesh_needs_generated(true), mesh_generation_type(MeshGenerationType::culling_voxel_mesh), collider_node(nullptr)
 {
 
 }
@@ -448,10 +449,23 @@ void VoxelCube::generate_collider()
 {
     if (!mesh_node) { return; }
     // Note This seems to create a static body child, I need it only create a collider and under the same parent
-    mesh_node->create_convex_collision();
+    //mesh_node->create_convex_collision();
+    mesh_node->create_trimesh_collision();
 
     // Temp fix
-    CollisionShape3D* collider_node = dynamic_cast<CollisionShape3D*>(mesh_node->get_child(0)->get_child(0));
+    if (collider_node) {
+        collider_node->queue_free();
+        collider_node = nullptr;
+    }
+    collider_node = dynamic_cast<CollisionShape3D*>(mesh_node->get_child(0)->get_child(0));
     collider_node->reparent(this);
     mesh_node->get_child(0)->queue_free(); // Remove the static body
+}
+
+void VoxelCube::remove_voxel(Vector3 voxel_position)
+{
+    UtilityFunctions::print("VoxelCube remove_voxel()");
+    int voxel_index = VoxelUtility::voxel_index_from_position(size.x, size.y, voxel_position);
+    voxels->at(voxel_index) = 0;
+    mesh_needs_generated = true;
 }

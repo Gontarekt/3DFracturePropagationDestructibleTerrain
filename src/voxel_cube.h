@@ -16,6 +16,7 @@
 #include <godot_cpp/classes/static_body3d.hpp>
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/classes/mesh_instance3d.hpp>
+#include <godot_cpp/classes/collision_shape3d.hpp>
 #include <vector>
 
 enum MeshGenerationType {
@@ -36,7 +37,9 @@ private:
 	// Represent voxels with a simple integer value, 0 means no voxel, index calculated via helper functions to convert 3D to 1D array.
 	std::unique_ptr<std::vector<uint8_t>> voxels;
 	MeshInstance3D* mesh_node;
+	CollisionShape3D* collider_node;
 	int num_tests_to_run;
+	// Must set to true if you want the voxel mesh to regenerate
 	bool mesh_needs_generated;
 	std::vector<double> timings;
 	MeshGenerationType mesh_generation_type;
@@ -66,6 +69,8 @@ public:
 	void generate_triangle_list_quad(); // Test function
 	void generate_voxel_mesh();
 	void generate_collider();
+
+	void remove_voxel(Vector3 voxel_position);
 };
 
 } // namespace godot
