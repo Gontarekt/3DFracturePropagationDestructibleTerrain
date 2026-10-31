@@ -13,6 +13,7 @@
 #pragma once
 
 #include <godot_cpp/classes/node3d.hpp>
+#include <godot_cpp/classes/static_body3d.hpp>
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/classes/mesh_instance3d.hpp>
 #include <vector>
@@ -26,8 +27,8 @@ VARIANT_ENUM_CAST(MeshGenerationType);
 
 namespace godot {
 
-class VoxelCube : public Node3D {
-	GDCLASS(VoxelCube, Node3D)
+class VoxelCube : public StaticBody3D {
+	GDCLASS(VoxelCube, StaticBody3D)
 
 private:
 	Vector3i size;
@@ -64,6 +65,7 @@ public:
 	void generate_triangle_strip_quad(); // Test function
 	void generate_triangle_list_quad(); // Test function
 	void generate_voxel_mesh();
+	void generate_collider();
 };
 
 } // namespace godot

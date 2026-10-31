@@ -1,11 +1,12 @@
 #pragma once
 
 #include <godot_cpp/classes/node3d.hpp>
+#include <godot_cpp/classes/static_body3d.hpp>
 
 namespace godot {
 
-class VoxelTerrain : public Node3D {
-	GDCLASS(VoxelTerrain, Node3D)
+class VoxelTerrain : public StaticBody3D {
+	GDCLASS(VoxelTerrain, StaticBody3D)
 
 private:
 

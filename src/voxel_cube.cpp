@@ -7,6 +7,7 @@
 #include <vector>
 #include <chrono>
 #include "voxel_utility.h"
+#include <godot_cpp/classes/collision_shape3d.hpp>
 
 using namespace godot;
 
@@ -239,6 +240,11 @@ void VoxelCube::generate_mesh()
     UtilityFunctions::print("VoxelCube mesh generation took an average of ", average_time, " ms");
 
     mesh_needs_generated = false;
+    std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
+    generate_collider();
+    std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
+    double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+    UtilityFunctions::print("VoxelCube collider generation took ", elapsed_time, " ms");
 }
 
 void VoxelCube::generate_voxel_mesh()
@@ -436,4 +442,16 @@ void VoxelCube::generate_voxel_mesh()
         array_mesh->clear_surfaces();
         array_mesh->add_surface_from_arrays(Mesh::PrimitiveType::PRIMITIVE_TRIANGLES, surface_array);
     }
+}
+
+void VoxelCube::generate_collider()
+{
+    if (!mesh_node) { return; }
+    // Note This seems to create a static body child, I need it only create a collider and under the same parent
+    mesh_node->create_convex_collision();
+
+    // Temp fix
+    CollisionShape3D* collider_node = dynamic_cast<CollisionShape3D*>(mesh_node->get_child(0)->get_child(0));
+    collider_node->reparent(this);
+    mesh_node->get_child(0)->queue_free(); // Remove the static body
 }
