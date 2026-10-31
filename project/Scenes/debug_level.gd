@@ -5,7 +5,14 @@ var ray: RayCast3D
 var ray_collided: bool = false
 @onready var camera: Camera3D = $Core/Camera3D
 @export var ray_one_collision_per_cast: bool = true
-
+@export var debug_draw_mode: Viewport.DebugDraw = 0 :
+	set(value):
+		debug_draw_mode = value
+		get_viewport().debug_draw = debug_draw_mode
+		if (debug_draw_mode == Viewport.DebugDraw.DEBUG_DRAW_WIREFRAME):
+			RenderingServer.set_debug_generate_wireframes(debug_draw_mode)
+		else:
+			RenderingServer.set_debug_generate_wireframes(false)
 # Variables that will be passed into fracture propagation start function
 #var impact_force: float = 1.0f
 #var impacted_speed_metres_per_second: float = 1.0f
@@ -19,7 +26,9 @@ func _ready() -> void:
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(_delta: float) -> void:
 	ImGui.Begin("Debug Window")
-	ImGui.Text("TODO: Wireframe toggle")
+	var current_mode_array: Array = [debug_draw_mode]
+	if(ImGui.Combo("Debug Draw Mode", current_mode_array, ["Disabled", "Unshaded", "Overdraw", "Wireframe"])):
+		debug_draw_mode = current_mode_array[0]
 	ImGui.Text("TODO: Material Toughness display toggle")
 	ImGui.End()
 
