@@ -3,6 +3,8 @@
  * https://gist.github.com/eisenwave/c48bf988fc29d1c8bf0d4512d3916d22
  * Use this site to design the implemention of the SVO.
  *
+ * Morton Codes: https://github.com/Forceflow/libmorton
+ *
  * Differences in my implementation:
  * - Compared to them, I use unsigned position, so no negative positions for voxels.
  * - The center of my octree is size/2
@@ -61,6 +63,7 @@
 #include <array>
 #include <vector>
 #include <libmorton/morton.h>
+#include <godot_cpp/classes/node3d.hpp> // For debug prints!
 
 class SparseVoxelOctree
 {
@@ -80,8 +83,12 @@ class SparseVoxelOctree
             std::array<std::unique_ptr<Node>, 8> children;
         };
 
+        // Make sure the byte size and alignment of the leaf matches the branch to
+        // mitigate cache misses, might not need to make it the exact same size but just close.
+        // TODO: Test if this actually is beneficial, also whether the memory cost outweighs the performance boost if any.
         struct Leaf : public Node {
-            std::array<int8_t, 8> data{};
+            // Reduces cache misses by using an array at the second-to-final depth
+            std::array<int32_t, 8> data{};
         };
 
         void generate_octree_from_voxel_array(std::vector<int8_t> voxel_array)
@@ -112,70 +119,71 @@ class SparseVoxelOctree
 
         int64_t _get_index_from_position(int x, int y, int z)
         {
-            // Convert 3D Position into Morton Code (Interweave the x,y,z into sequential 3 bit sequences which
-            // provide the index at each level of the octree)
-            // [0, 1, 2, 3] is -X. [4, 5, 6, 7] is +X.
-            // [0, 1, 4, 5] is -Y. [2, 3, 6, 7] is +Y.
-            // [0, 2, 4, 6] is -Z. [1, 3, 5, 7] is +Z.
-
-            //isVoxelInsideSVO(x,y,z); // Don't think this is required for my implementation
-
-            // https://graphics.stanford.edu/~seander/bithacks.html#InterleaveBMN
-            // This uses the bit twiddling hacks from this site. Interweave the bits using magic numbers!
-            // constexpr size_t NUM_INPUTS = 3;
-            // constexpr uint64_t MASKS[] = {
-            //     0x9249'2492'4924'9249,
-            //     0x30C3'0C30'C30C'30C3,
-            //     0xF00F'00F0'0F00'F00F,
-            //     0x00FF'0000'FF00'00FF,
-            //     0xFFFF'0000'0000'FFFF
-            // };
-
-            // // Interweave 2 0 bits after each bit value of the x, y & z position values
-            // // Mainly based off: https://eisenwave.github.io/voxel-compression-docs/svo/construction.html
-            // // TODO: I could probably rewrite this!
-            // uint64_t morton_code_x = x;
-            // for (int i = 4; i != 1; --i) {
-            //     const auto shift = (NUM_INPUTS - 1) * (1 << i);
-            //     morton_code_x |= morton_code_x << shift;
-            //     morton_code_x &= MASKS[i];
-            // }
-            // uint64_t morton_code_y = y;
-            // for (int i = 4; i != 1; --i) {
-            //     const auto shift = (NUM_INPUTS - 1) * (1 << i);
-            //     morton_code_y |= morton_code_y << shift;
-            //     morton_code_y &= MASKS[i];
-            // }
-            // uint64_t morton_code_z = z;
-            // for (int i = 4; i != 1; --i) {
-            //     const auto shift = (NUM_INPUTS - 1) * (1 << i);
-            //     morton_code_z |= morton_code_z << shift;
-            //     morton_code_z &= MASKS[i];
-            // }
-            // // Combine the x,y & z morton values into a sequence of 3 bits (xyz, xyz, xyz... and so on)
-            // // Each bit will be a 0 to 1 value that represent left or right on that axis for each divison of the octree!
-            // return (morton_code_x << 2) | (morton_code_y << 1) | (morton_code_z);
-
             return libmorton::morton3D_64_encode(x,y,z);
         }
 
         // Traverse the octree until it finds the value of the smallest node at the position interleaved in the index
-        int8_t _find_node_value(int8_t octreeNodeIndex)
+        int8_t _find_node_value(int8_t octreeIndex)
         {
             return 0;
         }
 
         // Traverses the Octree to reach the index, creating a leaf node at the exact position in maximum depth if
-        // a leaf node doesn't already exist, if one does, it returns its value by reference.
-        int8_t& _find_or_create_node(int8_t octreeNodeIndex)
+        // a leaf node doesn't already exist. Returns the value of the leaf node by reference.
+        int32_t& _find_or_create_node(int8_t octreeIndex)
         {
             // Should traverse using the index until it finds a leaf node or has fully read the morton code index
-            // return the data value in that leaf node that the index points to.
+            // return the data value in the leaf node that the index points to.
             // Note: You need to determine the maximum depth of the octree to know how much of Morton code to read.
 
-            // Recursively traverse octree until Morton code has been fully read or leaf node has been found.
-            // TODO
+            /*
+             * LibMorton places X as the LSB (right-most bit) and
+             * also places the deepest node index in the LSB part of the Morton Code sequence.
+             * So I need to use the depth to get the left-most point of the morton code.
+             */
+            Node* current_node = root.get();
+            for (int i = 3 * (_max_depth-1); i >= 0; i-=3)
+            {
+                uint_fast16_t node_index = (octreeIndex >> i) & 0b111;
 
+                // NOTE: Since we know what type a node is going to be at any given point,
+                // use static_cast to avoid the overhead of dynamic cast!
+                if (i == 0)
+                {
+                    godot::UtilityFunctions::print("current node is a leaf, returning data at index");
+
+                    // If at the end of the morton code, then you can gaurantee it is a leaf node.
+                    Leaf* leaf = static_cast<Leaf*>(current_node);
+                    return leaf->data[node_index];
+                }
+                else {
+                    // Since we haven't fully read the Morton code yet, we should create new nodes
+                    // where there is a missing node.
+
+                    Branch* branch = static_cast<Branch*>(current_node);
+                    Node* child_node = branch->children[node_index].get();
+                    if (child_node != nullptr)
+                    {
+                        // Node found, traverse it on next pass.
+                        current_node = child_node;
+
+                        godot::UtilityFunctions::print("Child is not nullptr, moving to that node next");
+                    }
+                    else {
+                        // Create new node.
+
+                        godot::UtilityFunctions::print("Child is nullptr, creating new node");
+
+                        // If this is the pen-ultimate depth, create a leaf node, otherwise branch.
+                        // (Remember the final depth will be represented by the data array in the leaf!)
+                        std::unique_ptr<Node> new_child = i == 3
+                            ? static_cast<std::unique_ptr<Node>>(std::make_unique<Leaf>())
+                            : static_cast<std::unique_ptr<Node>>(std::make_unique<Branch>());
+                        current_node = new_child.get();
+                        branch->children[node_index] = std::move(new_child);
+                    }
+                }
+            }
         }
 
     private:
