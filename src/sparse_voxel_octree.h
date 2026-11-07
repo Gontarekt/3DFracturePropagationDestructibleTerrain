@@ -60,6 +60,7 @@
 #include <memory>
 #include <array>
 #include <vector>
+#include <libmorton/morton.h>
 
 class SparseVoxelOctree
 {
@@ -121,39 +122,41 @@ class SparseVoxelOctree
 
             // https://graphics.stanford.edu/~seander/bithacks.html#InterleaveBMN
             // This uses the bit twiddling hacks from this site. Interweave the bits using magic numbers!
-            constexpr size_t NUM_INPUTS = 3;
-            constexpr uint64_t MASKS[] = {
-                0x9249'2492'4924'9249,
-                0x30C3'0C30'C30C'30C3,
-                0xF00F'00F0'0F00'F00F,
-                0x00FF'0000'FF00'00FF,
-                0xFFFF'0000'0000'FFFF
-            };
+            // constexpr size_t NUM_INPUTS = 3;
+            // constexpr uint64_t MASKS[] = {
+            //     0x9249'2492'4924'9249,
+            //     0x30C3'0C30'C30C'30C3,
+            //     0xF00F'00F0'0F00'F00F,
+            //     0x00FF'0000'FF00'00FF,
+            //     0xFFFF'0000'0000'FFFF
+            // };
 
-            // Interweave 2 0 bits after each bit value of the x, y & z position values
-            // Mainly based off: https://eisenwave.github.io/voxel-compression-docs/svo/construction.html
-            // TODO: I could probably rewrite this!
-            uint64_t morton_code_x = x;
-            for (int i = 4; i != 1; --i) {
-                const auto shift = (NUM_INPUTS - 1) * (1 << i);
-                morton_code_x |= morton_code_x << shift;
-                morton_code_x &= MASKS[i];
-            }
-            uint64_t morton_code_y = y;
-            for (int i = 4; i != 1; --i) {
-                const auto shift = (NUM_INPUTS - 1) * (1 << i);
-                morton_code_y |= morton_code_y << shift;
-                morton_code_y &= MASKS[i];
-            }
-            uint64_t morton_code_z = z;
-            for (int i = 4; i != 1; --i) {
-                const auto shift = (NUM_INPUTS - 1) * (1 << i);
-                morton_code_z |= morton_code_z << shift;
-                morton_code_z &= MASKS[i];
-            }
-            // Combine the x,y & z morton values into a sequence of 3 bits (xyz, xyz, xyz... and so on)
-            // Each bit will be a 0 to 1 value that represent left or right on that axis for each divison of the octree!
-            return (morton_code_x << 2) | (morton_code_y << 1) | (morton_code_z);
+            // // Interweave 2 0 bits after each bit value of the x, y & z position values
+            // // Mainly based off: https://eisenwave.github.io/voxel-compression-docs/svo/construction.html
+            // // TODO: I could probably rewrite this!
+            // uint64_t morton_code_x = x;
+            // for (int i = 4; i != 1; --i) {
+            //     const auto shift = (NUM_INPUTS - 1) * (1 << i);
+            //     morton_code_x |= morton_code_x << shift;
+            //     morton_code_x &= MASKS[i];
+            // }
+            // uint64_t morton_code_y = y;
+            // for (int i = 4; i != 1; --i) {
+            //     const auto shift = (NUM_INPUTS - 1) * (1 << i);
+            //     morton_code_y |= morton_code_y << shift;
+            //     morton_code_y &= MASKS[i];
+            // }
+            // uint64_t morton_code_z = z;
+            // for (int i = 4; i != 1; --i) {
+            //     const auto shift = (NUM_INPUTS - 1) * (1 << i);
+            //     morton_code_z |= morton_code_z << shift;
+            //     morton_code_z &= MASKS[i];
+            // }
+            // // Combine the x,y & z morton values into a sequence of 3 bits (xyz, xyz, xyz... and so on)
+            // // Each bit will be a 0 to 1 value that represent left or right on that axis for each divison of the octree!
+            // return (morton_code_x << 2) | (morton_code_y << 1) | (morton_code_z);
+
+            return libmorton::morton3D_64_encode(x,y,z);
         }
 
         // Traverse the octree until it finds the value of the smallest node at the position interleaved in the index

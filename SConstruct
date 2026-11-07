@@ -5,11 +5,17 @@ import sys
 # You can find documentation for SCons and SConstruct files at:
 # https://scons.org/documentation.html
 
+env = Environment(tools=['compilation_db'])
+env.CompilationDatabase()
+
 # This lets SCons know that we're using godot-cpp, from the godot-cpp folder.
 env = SConscript("godot-cpp/SConstruct")
 
 # Configures the 'src' directory as a source for header files.
-env.Append(CPPPATH=["src/"])
+env.Append(CPPPATH=[
+    "src/",
+    "libmorton-main/include/"
+    ])
 
 # Collects all .cpp files in the 'src' folder as compile targets.
 sources = Glob("src/*.cpp")
@@ -30,3 +36,4 @@ library = env.SharedLibrary(
 
 # Selects the shared library as the default target.
 Default(library)
+

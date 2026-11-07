@@ -1,6 +1,7 @@
 #include "voxel_terrain.h"
 #include "voxel_utility.h"
 #include <bitset>
+#include <libmorton/morton.h>
 
 using namespace godot;
 
@@ -36,7 +37,8 @@ void VoxelTerrain::_ready()
     // Decimal: 25
     int64_t index8 = _get_index_from_position(6,8,9);
     int64_t index9 = _get_index_from_position(127,127,127);
-    int64_t index10 = ileave3(6, 8, 9);
+    // int64_t index10 = ileave3(6, 8, 9);
+    int64_t index10 = libmorton::morton3D_64_encode(6, 8, 9);
 
     UtilityFunctions::print("Morton Code 1 : ", std::bitset<64>(index1).to_string().c_str(), " int: ", index1);
     UtilityFunctions::print("Morton Code 2: ", std::bitset<64>(index2).to_string().c_str(), " int: ", index2);
