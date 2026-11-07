@@ -42,7 +42,13 @@ void VoxelCube::_ready()
 {
     // Generate the voxel array
     num_voxels = size.x*size.y*size.z;
+
+    std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
     voxels = std::make_unique<std::vector<uint8_t>>(num_voxels, 1);
+    std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
+    double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+    UtilityFunctions::print("VoxelCube grid generation took ", elapsed_time, " ms");
+
     if (voxels) {
         UtilityFunctions::print("Voxel array size: ", voxels->size());
     }

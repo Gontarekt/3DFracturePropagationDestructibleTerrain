@@ -6,10 +6,15 @@
 using namespace godot;
 
 void VoxelTerrain::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("get_num_tests_to_run"), &VoxelTerrain::get_num_tests_to_run);
+	ClassDB::bind_method(D_METHOD("set_num_tests_to_run", "new_num_tests_to_run"), &VoxelTerrain::set_num_tests_to_run);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "num_tests_to_run"), "set_num_tests_to_run", "get_num_tests_to_run");
 
+	//ClassDB::bind_method(D_METHOD("remove_voxel", "voxel_position"), &VoxelCube::remove_voxel);
 }
 
-VoxelTerrain::VoxelTerrain() : sparse_voxel_octree(terrain_chunk_size) {
+VoxelTerrain::VoxelTerrain() : sparse_voxel_octree(terrain_chunk_size), mesh_node(nullptr),
+num_tests_to_run(1), mesh_needs_generated(true), collider_node(nullptr) {
 
 }
 
@@ -20,11 +25,13 @@ VoxelTerrain::~VoxelTerrain() {
 void VoxelTerrain::_ready()
 {
     morton_code_test();
+    create_solid_cube_SVO();
+    mesh_node = dynamic_cast<MeshInstance3D*>(get_child(0));
 }
 
 void VoxelTerrain::_process(double delta)
 {
-
+    generate_mesh();
 }
 
 void VoxelTerrain::morton_code_test()
@@ -85,4 +92,280 @@ void VoxelTerrain::morton_code_test()
     UtilityFunctions::print("Morton Code 9: ", std::bitset<64>(index9).to_string().c_str(), " int: ", index9);
     UtilityFunctions::print("Morton Code 10: ", std::bitset<64>(index10).to_string().c_str(), " int: ", index10);
     UtilityFunctions::print("Morton Code 11: ", std::bitset<64>(index11).to_string().c_str(), " int: ", index11);
+}
+
+void VoxelTerrain::create_solid_cube_SVO()
+{
+    // NOTE: This breaks if you output too many godot debug statements!
+    std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
+    for (int x = 0; x < terrain_chunk_size; x++)
+    {
+        for (int y = 0; y < terrain_chunk_size; y++)
+        {
+            for (int z = 0; z < terrain_chunk_size; z++)
+            {
+                sparse_voxel_octree.insert_voxel(x,y,z,1);
+            }
+        }
+    }
+    std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
+    double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+    UtilityFunctions::print("Terrain Solid Cube generation took: ", elapsed_time, " ms");
+}
+
+void VoxelTerrain::generate_mesh()
+{
+    if (!mesh_node || !mesh_needs_generated) { return; }
+
+    /// Procedurally generate voxel mesh from voxel grid
+
+    timings.clear();
+    for (int i = 0; i < num_tests_to_run; i++)
+    {
+        std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
+
+        generate_culling_voxel_mesh();
+
+        std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
+        double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+        timings.push_back(elapsed_time);
+        // To prevent overflow of the debug output, don't output for every test if testing a lot of iterations.
+        if (num_tests_to_run < 500)
+        {
+            UtilityFunctions::print("VoxelTerrain mesh generation took ", elapsed_time, " ms");
+        }
+    }
+    double average_time = 0.0;
+    for (auto time : timings)
+    {
+        average_time += time;
+    }
+    average_time /= timings.size();
+    UtilityFunctions::print("VoxelTerrain mesh generation took an average of ", average_time, " ms");
+
+    mesh_needs_generated = false;
+    std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
+    generate_collider();
+    std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
+    double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+    UtilityFunctions::print("VoxelTerrain collider generation took ", elapsed_time, " ms");
+}
+
+void VoxelTerrain::generate_culling_voxel_mesh()
+{
+    if (!mesh_node) { return;}
+
+    //// VERTICES
+
+    std::vector<Vector3> vertices_vector;
+    PackedVector3Array vertices;
+    std::vector<int32_t> indices_vector;
+    PackedInt32Array indices;
+    std::vector<Vector3> normals_vector;
+    PackedVector3Array normals;
+    // std::vector<Color> colours_vector;
+    // PackedColorArray colours;
+    // std::vector<Vector2> uvs_vector;
+    // PackedVector2Array uvs;
+
+    /// Generate vertices per voxel
+
+    int vertex_offset = 0;
+    for (int x = 0; x < terrain_chunk_size; x++)
+    {
+        for (int y = 0; y < terrain_chunk_size; y++)
+        {
+            for (int z = 0; z < terrain_chunk_size; z++)
+            {
+                /// Ignore empty voxels
+
+                if (sparse_voxel_octree.get_voxel(x,y,z) == 0) { continue; }
+
+                //// Render voxel faces
+                // Only render faces if the voxel adjacent to that face is empty, otherwise do not draw it (cull the face).
+
+                /// Construct vertex positions (there are 8)
+                // All faces drawn in Z shape, starting from top left.
+                // x -+: left-right
+                // y -+: bottom-top
+                // z -+: front-back
+
+                const Vector3 back_top_left = Vector3(-0.5 + x, 0.5 + y, 0.5 + z);
+                const Vector3 back_top_right = Vector3(0.5 + x, 0.5 + y, 0.5 + z);
+                const Vector3 back_bottom_left = Vector3(-0.5 + x, -0.5 + y, 0.5 + z);
+                const Vector3 back_bottom_right = Vector3(0.5 + x, -0.5 + y, 0.5 + z);
+                const Vector3 front_top_left = Vector3(-0.5 + x, 0.5 + y, -0.5 + z);
+                const Vector3 front_top_right = Vector3(0.5 + x, 0.5 + y, -0.5 + z);
+                const Vector3 front_bottom_left = Vector3(-0.5 + x, -0.5 + y, -0.5 + z);
+                const Vector3 front_bottom_right = Vector3(0.5 + x, -0.5 + y, -0.5 + z);
+
+                /// TOP FACE
+
+                uint8_t voxel_value = 0;
+                if (y+1 < terrain_chunk_size) { voxel_value = sparse_voxel_octree.get_voxel(x,y + 1,z); };
+                if (voxel_value == 0)
+                {
+                    vertices_vector.push_back(front_top_left);
+                    vertices_vector.push_back(front_top_right);
+                    vertices_vector.push_back(back_top_left);
+                    vertices_vector.push_back(back_top_right);
+
+                    VoxelUtility::generate_indices_for_quad(indices_vector, vertex_offset);
+                    VoxelUtility::generate_normals_for_quad(normals_vector, VoxelUtility::UP);
+
+                    vertex_offset += 4;
+                }
+
+                /// BOTTOM FACE
+
+                voxel_value = 0;
+                if (y-1 >= 0) { voxel_value = sparse_voxel_octree.get_voxel(x,y - 1,z); };
+                if (voxel_value == 0)
+                {
+                    vertices_vector.push_back(back_bottom_left);
+                    vertices_vector.push_back(back_bottom_right);
+                    vertices_vector.push_back(front_bottom_left);
+                    vertices_vector.push_back(front_bottom_right);
+
+                    VoxelUtility::generate_indices_for_quad(indices_vector, vertex_offset);
+                    VoxelUtility::generate_normals_for_quad(normals_vector, VoxelUtility::DOWN);
+
+                    vertex_offset += 4;
+                }
+
+                /// LEFT FACE
+
+                voxel_value = 0;
+                if (x-1 >= 0) { voxel_value = sparse_voxel_octree.get_voxel(x - 1,y,z); };
+                if (voxel_value == 0)
+                {
+                    vertices_vector.push_back(front_top_left);
+                    vertices_vector.push_back(back_top_left);
+                    vertices_vector.push_back(front_bottom_left);
+                    vertices_vector.push_back(back_bottom_left);
+
+                    VoxelUtility::generate_indices_for_quad(indices_vector, vertex_offset);
+                    VoxelUtility::generate_normals_for_quad(normals_vector, VoxelUtility::LEFT);
+
+                    vertex_offset += 4;
+                }
+
+                /// RIGHT FACE
+
+                voxel_value = 0;
+                if (x+1 < terrain_chunk_size) { voxel_value = sparse_voxel_octree.get_voxel(x + 1,y,z); };
+                if (voxel_value == 0)
+                {
+                    vertices_vector.push_back(back_top_right);
+                    vertices_vector.push_back(front_top_right);
+                    vertices_vector.push_back(back_bottom_right);
+                    vertices_vector.push_back(front_bottom_right);
+
+                    VoxelUtility::generate_indices_for_quad(indices_vector, vertex_offset);
+                    VoxelUtility::generate_normals_for_quad(normals_vector, VoxelUtility::RIGHT);
+
+                    vertex_offset += 4;
+                }
+
+                /// FRONT FACE
+
+                voxel_value = 0;
+                if (z-1 >= 0) { voxel_value = sparse_voxel_octree.get_voxel(x,y,z-1); };
+                if (voxel_value == 0)
+                {
+                    vertices_vector.push_back(front_top_right);
+                    vertices_vector.push_back(front_top_left);
+                    vertices_vector.push_back(front_bottom_right);
+                    vertices_vector.push_back(front_bottom_left);
+
+                    VoxelUtility::generate_indices_for_quad(indices_vector, vertex_offset);
+                    VoxelUtility::generate_normals_for_quad(normals_vector, VoxelUtility::FORWARD);
+
+                    vertex_offset += 4;
+                }
+
+                /// BACK FACE
+
+                voxel_value = 0;
+                if (z+1 < terrain_chunk_size) { voxel_value = sparse_voxel_octree.get_voxel(x,y,z+1); };
+                if (voxel_value == 0)
+                {
+                    vertices_vector.push_back(back_top_left);
+                    vertices_vector.push_back(back_top_right);
+                    vertices_vector.push_back(back_bottom_left);
+                    vertices_vector.push_back(back_bottom_right);
+
+                    VoxelUtility::generate_indices_for_quad(indices_vector, vertex_offset);
+                    VoxelUtility::generate_normals_for_quad(normals_vector, VoxelUtility::BACKWARD);
+
+                    vertex_offset += 4;
+                }
+            }
+        }
+    }
+
+    /// Pack data into arrays
+
+    vertices.resize(vertices_vector.size());
+    for (int i = 0; i < vertices_vector.size(); i ++)
+    {
+        vertices.set(i, vertices_vector[i]);
+    }
+    indices.resize(indices_vector.size());
+    for (int i = 0; i < indices_vector.size(); i ++)
+    {
+        indices.set(i, indices_vector[i]);
+    }
+    normals.resize(normals_vector.size());
+    for (int i = 0; i < normals_vector.size(); i ++)
+    {
+        normals.set(i, normals_vector[i]);
+    }
+    // uvs.resize(uvs_vector.size());
+    // for (int i = 0; i < uvs_vector.size(); i ++)
+    // {
+    //     uvs.set(i, uvs_vector[i]);
+    // }
+
+    /// Create surface array from generated mesh data
+
+    Array surface_array;
+    surface_array.resize(Mesh::ArrayType::ARRAY_MAX);
+    surface_array[(int)Mesh::ArrayType::ARRAY_VERTEX] = vertices;
+    surface_array[(int)Mesh::ArrayType::ARRAY_INDEX] = indices;
+    surface_array[(int)Mesh::ArrayType::ARRAY_NORMAL] = normals;
+    //surface_array[(int)Mesh::ArrayType::ARRAY_COLOR] = colours;
+    //surface_array[(int)Mesh::ArrayType::ARRAY_TEX_UV] = uvs;
+
+    /// Create mesh from Surface Array
+
+    Ref<Mesh> mesh = mesh_node->get_mesh();
+    if(ArrayMesh* array_mesh = Object::cast_to<ArrayMesh>(mesh.ptr()))
+    {
+        array_mesh->clear_surfaces();
+        array_mesh->add_surface_from_arrays(Mesh::PrimitiveType::PRIMITIVE_TRIANGLES, surface_array);
+    }
+}
+
+void VoxelTerrain::generate_collider()
+{
+    if (!mesh_node) { return; }
+    // Note This seems to create a static body child, I need it only create a collider and under the same parent
+    //mesh_node->create_convex_collision();
+    mesh_node->create_trimesh_collision();
+
+    // Temp fix
+    if (collider_node) {
+        collider_node->queue_free();
+        collider_node = nullptr;
+    }
+    collider_node = dynamic_cast<CollisionShape3D*>(mesh_node->get_child(0)->get_child(0));
+    collider_node->reparent(this);
+    mesh_node->get_child(0)->queue_free(); // Remove the static body
+}
+
+void VoxelTerrain::set_num_tests_to_run(const int new_num_tests_to_run)
+{
+    num_tests_to_run = new_num_tests_to_run;
+    num_tests_to_run = std::max(num_tests_to_run, 1);
 }

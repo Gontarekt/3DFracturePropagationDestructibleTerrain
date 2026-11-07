@@ -56,8 +56,17 @@
  * - Construct Nodes from Voxel array
  * - Optimise SVO by removing nodes that have empty children and combining when all children have the same data.
  *
+ * Limitations of implementation:
+ * - This won't handle very small grid sizes that don't have a minimum depth of 2
+ * The minimum this octree can represent is root->leaf->leafValue.
+ * So that would make the minimum voxel grid size 4x4x4. However an octree would be a waste at those sizes anyway, it is expected to be used
+ * for sizes of 16 and up.
  */
 
+// NOTE: Remove this later as well as the debug statements to make the code more readable and also not godot dependant.
+//#define DEBUG_SVO
+
+#include "godot_cpp/variant/vector3i.hpp"
 #include <cmath>
 #include <cstdint>
 #include <memory>
@@ -92,27 +101,39 @@ class SparseVoxelOctree
             std::array<int32_t, 8> data{};
         };
 
-        void generate_octree_from_voxel_array(std::vector<int8_t> voxel_array)
-        {
-            /// TODO
-        }
-
         void insert_voxel(uint_fast32_t x, uint_fast32_t y, uint_fast32_t z, int32_t voxel)
         {
-             godot::UtilityFunctions::print("\nSVO.insert_voxel():");
+            #ifdef DEBUG_SVO
+            godot::UtilityFunctions::print("\nSVO.insert_voxel():");
+            #endif
+
             int64_t octree_index = _get_index_from_position(x, y, z);
             int32_t& node_value = _find_or_create_node(octree_index);
+
+            #ifdef DEBUG_SVO
              godot::UtilityFunctions::print("Node value in SVO at X: ", x, " Y: ", y, " Z: ", z, " was: ", node_value);
+            #endif
+
             node_value = voxel;
+
+            #ifdef DEBUG_SVO
             godot::UtilityFunctions::print("Node value in SVO is now: ", node_value);
+            #endif
         }
 
         uint32_t get_voxel(uint_fast32_t x, uint_fast32_t y, uint_fast32_t z)
         {
+            #ifdef DEBUG_SVO
             godot::UtilityFunctions::print("\nSVO.get_voxel():");
+            #endif
+
             int64_t octree_index = _get_index_from_position(x, y, z);
             uint32_t node_value = _find_node_value(octree_index);
+
+            #ifdef DEBUG_SVO
             godot::UtilityFunctions::print("Node value found in SVO at : X: ", x, " Y: ", y, " Z: ", z, " is: ", node_value);
+            #endif
+
             return node_value;
         }
 
@@ -152,16 +173,20 @@ class SparseVoxelOctree
             {
                 uint_fast8_t node_index = (octree_index >> i) & 0b111;
 
+                #ifdef DEBUG_SVO
                 godot::UtilityFunctions::print(
                     "Morton digit: ", node_index,
                     " Bit position: ", i
                 );
+                #endif
 
                 // NOTE: Since we know what type a node is going to be at any given point,
                 // use static_cast to avoid the overhead of dynamic cast!
                 if (i == 0)
                 {
+                    #ifdef DEBUG_SVO
                     godot::UtilityFunctions::print("current node is a leaf, returning data at index");
+                    #endif
 
                     // If at the end of the morton code, then you can gaurantee it is a leaf node.
                     Leaf* leaf = static_cast<Leaf*>(current_node);
@@ -178,10 +203,14 @@ class SparseVoxelOctree
                         // Node found, traverse it on next pass.
                         current_node = child_node;
 
+                        #ifdef DEBUG_SVO
                         godot::UtilityFunctions::print("Child is not nullptr, moving to that node next");
+                        #endif
                     }
                     else {
+                        #ifdef DEBUG_SVO
                         godot::UtilityFunctions::print("Child is nullptr, no voxel at the position, return 0");
+                        #endif
 
                         // as the branch is nullptr, this means no voxel data is stored at the position
                         return 0;
@@ -210,16 +239,20 @@ class SparseVoxelOctree
                 // This is simply a 0-7 value to get the index of the child at the current node
                 uint_fast8_t node_index = (octree_index >> i) & 0b111;
 
+                #ifdef DEBUG_SVO
                 godot::UtilityFunctions::print(
                     "Morton digit: ", node_index,
                     " Bit position: ", i
                 );
+                #endif
 
                 // NOTE: Since we know what type a node is going to be at any given point,
                 // use static_cast to avoid the overhead of dynamic cast!
                 if (i == 0)
                 {
+                    #ifdef DEBUG_SVO
                     godot::UtilityFunctions::print("current node is a leaf, returning data at index");
+                    #endif
 
                     // If at the end of the morton code, then you can gaurantee it is a leaf node.
                     Leaf* leaf = static_cast<Leaf*>(current_node);
@@ -236,12 +269,16 @@ class SparseVoxelOctree
                         // Node found, traverse it on next pass.
                         current_node = child_node;
 
+                        #ifdef DEBUG_SVO
                         godot::UtilityFunctions::print("Child is not nullptr, moving to that node next");
+                        #endif
                     }
                     else {
                         // Create new node.
 
+                        #ifdef DEBUG_SVO
                         godot::UtilityFunctions::print("Child is nullptr, creating new node");
+                        #endif
 
                         // If this is the pen-ultimate depth, create a leaf node, otherwise branch.
                         // (Remember the final depth will be represented by the data array in the leaf!)

@@ -36,7 +36,7 @@ transform = Transform3D(1, 0, 0, 0, 0.9416293, 0.33665156, 0, -0.33665156, 0.941
 script = ExtResource("1_jjgbg")
 
 [node name="VoxelCube" type="VoxelCube" parent="." unique_id=1475345895]
-size = Vector3i(100, 100, 100)
+size = Vector3i(64, 64, 64)
 transform = Transform3D(0.05, 0, 0, 0, 0.05, 0, 0, 0, 0.05, -0.0013208389, 0, -7.452941)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="VoxelCube" unique_id=1295143250]
@@ -52,7 +52,8 @@ mesh = SubResource("BoxMesh_7dm0k")
 shape = SubResource("ConvexPolygonShape3D_bo1nx")
 
 [node name="VoxelTerrain" type="VoxelTerrain" parent="." unique_id=1506125266]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.920139, 0, -7.429861)
+transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, -5.2761497, 0, -7.429861)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="VoxelTerrain" unique_id=864488893]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.820183, 0, -47.00197)
 mesh = SubResource("ArrayMesh_8gbba")
