@@ -24,6 +24,7 @@ public:
 
 	void morton_code_test();
 
+	static constexpr int terrain_chunk_size = 64;
 	SparseVoxelOctree sparse_voxel_octree;
 };
 

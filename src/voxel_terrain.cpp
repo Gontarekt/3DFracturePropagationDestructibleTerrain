@@ -9,7 +9,7 @@ void VoxelTerrain::_bind_methods() {
 
 }
 
-VoxelTerrain::VoxelTerrain() : sparse_voxel_octree(64) {
+VoxelTerrain::VoxelTerrain() : sparse_voxel_octree(terrain_chunk_size) {
 
 }
 
@@ -53,13 +53,23 @@ void VoxelTerrain::morton_code_test()
     // Y: 010, 010, 010, 000
     // Z: 000, 000, 100, 100
     // Combined: 011, 011, 111, 101
+    // 3, 3, 7, 5
     int64_t index8 = libmorton::morton3D_64_encode(15,14,3);
     for (int i = 3 * (4-1); i >= 0; i-=3)
     {
         uint_fast16_t node_index = (index8 >> i) & 0b111;
          UtilityFunctions::print("Index8 sequence:", std::bitset<64>(node_index).to_string().c_str());
     }
-    sparse_voxel_octree.insert(15, 14, 3, 1);
+    sparse_voxel_octree.insert_voxel(15, 14, 3, 1);
+    //sparse_voxel_octree.insert_voxel(15, 14, 3, 1);
+    //sparse_voxel_octree.insert_voxel(15, 14, 3, 1);
+    sparse_voxel_octree.get_voxel(15,14,3);
+    sparse_voxel_octree.get_voxel(14,14,13);
+    sparse_voxel_octree.get_voxel(0,0,0);
+    //UtilityFunctions::print("Value found in octree at 15, 14, 3: ", sparse_voxel_octree.get_voxel(15,14,13));
+    //UtilityFunctions::print("Value found in octree at 14, 14, 3: ", sparse_voxel_octree.get_voxel(14,14,13));
+    //UtilityFunctions::print("Value found in octree at 0, 0, 0: ", sparse_voxel_octree.get_voxel(0,0,0));
+
     int64_t index9 = libmorton::morton3D_64_encode(127,127,127);
     int64_t index10 = libmorton::morton3D_64_encode(6, 8, 9);
     int64_t index11 = libmorton::morton3D_64_encode(6, 5, 7);
