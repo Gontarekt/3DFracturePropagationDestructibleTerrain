@@ -29,6 +29,8 @@ public:
 	void _ready() override;
 	void _process(double delta) override;
 
+	void remove_voxel(Vector3 voxel_position);
+
 	void set_num_tests_to_run(const int new_num_tests_to_run);
 	int get_num_tests_to_run() const { return num_tests_to_run; }
 

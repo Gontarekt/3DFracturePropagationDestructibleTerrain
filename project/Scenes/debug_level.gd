@@ -51,6 +51,10 @@ func _process(_delta: float) -> void:
 				#print ("VoxelCube detected")
 				var voxel_cube = collided_object as VoxelCube
 				voxel_cube.remove_voxel(voxel_position)
+			elif collided_object is VoxelTerrain:
+				#print ("VoxelTerrain detected")
+				var voxel_terrain = collided_object as VoxelTerrain
+				voxel_terrain.remove_voxel(voxel_position)
 
 	if !left_mouse_held and Input.is_action_pressed("CreateRaycastAtMouse"):
 		left_mouse_held = true

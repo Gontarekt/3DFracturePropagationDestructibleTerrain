@@ -10,7 +10,7 @@ void VoxelTerrain::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_num_tests_to_run", "new_num_tests_to_run"), &VoxelTerrain::set_num_tests_to_run);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "num_tests_to_run"), "set_num_tests_to_run", "get_num_tests_to_run");
 
-	//ClassDB::bind_method(D_METHOD("remove_voxel", "voxel_position"), &VoxelCube::remove_voxel);
+	ClassDB::bind_method(D_METHOD("remove_voxel", "voxel_position"), &VoxelTerrain::remove_voxel);
 }
 
 VoxelTerrain::VoxelTerrain() : sparse_voxel_octree(terrain_chunk_size), mesh_node(nullptr),
@@ -151,6 +151,10 @@ void VoxelTerrain::generate_mesh()
     UtilityFunctions::print("VoxelTerrain collider generation took ", elapsed_time, " ms");
 }
 
+/*
+ * TODO: Make this take advantage of the octree so that it only loops through existing voxels instead of checking every voxel!
+ * I can check for the existing voxels via traversal of the octree (Although maybe this is actually slower, this is something to test)
+ */
 void VoxelTerrain::generate_culling_voxel_mesh()
 {
     if (!mesh_node) { return;}
@@ -368,4 +372,11 @@ void VoxelTerrain::set_num_tests_to_run(const int new_num_tests_to_run)
 {
     num_tests_to_run = new_num_tests_to_run;
     num_tests_to_run = std::max(num_tests_to_run, 1);
+}
+
+void VoxelTerrain::remove_voxel(Vector3 voxel_position)
+{
+    UtilityFunctions::print("VoxelTerrain remove_voxel()");
+    sparse_voxel_octree.insert_voxel(voxel_position.x, voxel_position.y, voxel_position.z, 0);
+    mesh_needs_generated = true;
 }
