@@ -85,7 +85,7 @@ class SparseVoxelOctree
         ~SparseVoxelOctree() = default;
 
         struct Node {
-
+            virtual ~Node() = default; // Required for it to be polymorphic
         };
 
         struct Branch : public Node {
@@ -93,12 +93,9 @@ class SparseVoxelOctree
             std::array<std::unique_ptr<Node>, 8> children;
         };
 
-        // Make sure the byte size and alignment of the leaf matches the branch to
-        // mitigate cache misses, might not need to make it the exact same size but just close.
-        // TODO: Test if this actually is beneficial, also whether the memory cost outweighs the performance boost if any.
         struct Leaf : public Node {
             // Reduces cache misses by using an array at the second-to-final depth
-            std::array<int32_t, 8> data{};
+            std::array<int8_t, 8> data{};
         };
 
         void insert_voxel(uint_fast32_t x, uint_fast32_t y, uint_fast32_t z, int32_t voxel)
@@ -108,7 +105,7 @@ class SparseVoxelOctree
             #endif
 
             int64_t octree_index = _get_index_from_position(x, y, z);
-            int32_t& node_value = _find_or_create_node(octree_index);
+            int8_t& node_value = _find_or_create_node(octree_index);
 
             #ifdef DEBUG_SVO
              godot::UtilityFunctions::print("Node value in SVO at X: ", x, " Y: ", y, " Z: ", z, " was: ", node_value);
@@ -121,14 +118,14 @@ class SparseVoxelOctree
             #endif
         }
 
-        uint32_t get_voxel(uint_fast32_t x, uint_fast32_t y, uint_fast32_t z)
+        int8_t get_voxel(uint_fast32_t x, uint_fast32_t y, uint_fast32_t z)
         {
             #ifdef DEBUG_SVO
             godot::UtilityFunctions::print("\nSVO.get_voxel():");
             #endif
 
             int64_t octree_index = _get_index_from_position(x, y, z);
-            uint32_t node_value = _find_node_value(octree_index);
+            int8_t node_value = _find_node_value(octree_index);
 
             #ifdef DEBUG_SVO
             godot::UtilityFunctions::print("Node value found in SVO at : X: ", x, " Y: ", y, " Z: ", z, " is: ", node_value);
@@ -146,7 +143,33 @@ class SparseVoxelOctree
 
         }
 
+        // returns num of bytes
+        size_t get_total_bytes_in_memory()
+        {
+            return _get_num_bytes_in_memory_of_node(root.get());
+        }
+
     private:
+
+        size_t _get_num_bytes_in_memory_of_node(const Node* node)
+        {
+            if (node == nullptr) { return 0; }
+
+            size_t total = 0;
+            if (auto branch = dynamic_cast<const Branch*>(node))
+            {
+                total += sizeof(*branch);
+                for (const auto& child : branch->children)
+                {
+                    total += _get_num_bytes_in_memory_of_node(child.get());
+                }
+            }
+            else if (auto leaf = dynamic_cast<const Leaf*>(node))
+            {
+                total += sizeof(*leaf);
+            }
+            return total;
+        }
 
         void _calculate_max_depth()
         {
@@ -170,7 +193,7 @@ class SparseVoxelOctree
         }
 
         // Traverse the octree until it finds the value of the smallest node at the position interleaved in the index
-        uint32_t _find_node_value(int64_t octree_index)
+        int8_t _find_node_value(int64_t octree_index)
         {
             /*
              * If child of branch is nullptr then no voxels stored,
@@ -230,7 +253,7 @@ class SparseVoxelOctree
 
         // Traverses the Octree to reach the index, creating a leaf node at the exact position in maximum depth if
         // a leaf node doesn't already exist. Returns the value of the leaf node by reference.
-        int32_t& _find_or_create_node(int64_t octree_index)
+        int8_t& _find_or_create_node(int64_t octree_index)
         {
             // Should traverse using the index until it finds a leaf node or has fully read the morton code index
             // return the data value in the leaf node that the index points to.

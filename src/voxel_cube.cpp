@@ -48,6 +48,7 @@ void VoxelCube::_ready()
     std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
     double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
     UtilityFunctions::print("VoxelCube grid generation took ", elapsed_time, " ms");
+    UtilityFunctions::print("VoxelCube NumBytes: ", sizeof(std::vector<uint8_t>) + (sizeof(uint8_t) * voxels->capacity()));
 
     if (voxels) {
         UtilityFunctions::print("Voxel array size: ", voxels->size());

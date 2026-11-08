@@ -137,6 +137,7 @@ void VoxelTerrain::create_solid_cube_SVO()
     std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
     double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
     UtilityFunctions::print("Terrain Solid Cube generation took: ", elapsed_time, " ms");
+    UtilityFunctions::print("Terrain NumBytes: ", sparse_voxel_octree.get_total_bytes_in_memory());
 }
 
 void VoxelTerrain::create_noise_terrain_SVO()
@@ -168,6 +169,7 @@ void VoxelTerrain::create_noise_terrain_SVO()
     std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
     double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
     UtilityFunctions::print("Terrain Noise generation took: ", elapsed_time, " ms");
+    UtilityFunctions::print("Terrain NumBytes: ", sparse_voxel_octree.get_total_bytes_in_memory());
 }
 
 void VoxelTerrain::generate_mesh()
