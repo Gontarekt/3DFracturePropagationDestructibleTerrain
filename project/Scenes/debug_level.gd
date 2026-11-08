@@ -16,6 +16,7 @@ var ray_collided: bool = false
 # Variables that will be passed into fracture propagation start function
 #var impact_force: float = 1.0f
 #var impacted_speed_metres_per_second: float = 1.0f
+@export var voxel_terrain: VoxelTerrain
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
@@ -25,12 +26,7 @@ func _ready() -> void:
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(_delta: float) -> void:
-	ImGui.Begin("Debug Window")
-	var current_mode_array: Array = [debug_draw_mode]
-	if(ImGui.Combo("Debug Draw Mode", current_mode_array, ["Disabled", "Unshaded", "Overdraw", "Wireframe"])):
-		debug_draw_mode = current_mode_array[0]
-	ImGui.Text("TODO: Material Toughness display toggle")
-	ImGui.End()
+	_draw_imgui()
 
 	if ray.is_colliding() and !ray_collided:
 		var collided_object = ray.get_collider()
@@ -71,3 +67,30 @@ func _create_raycast() -> void:
 	var mouse_pos = get_viewport().get_mouse_position()
 	ray.target_position = to_local(camera.project_ray_normal(mouse_pos)*100)
 	ray.global_position = to_global(camera.project_ray_origin(mouse_pos))
+
+
+func _draw_imgui() -> void:
+	ImGui.Begin("Debug Window")
+
+	var current_mode_array: Array = [debug_draw_mode]
+	if(ImGui.Combo("Debug Draw Mode", current_mode_array, ["Disabled", "Unshaded", "Overdraw", "Wireframe"])):
+		debug_draw_mode = current_mode_array[0]
+	#ImGui.Text("TODO: Material Toughness display toggle")
+
+	# Voxel Terrain
+	ImGui.Text("Voxel Terrain")
+	if(ImGui.Button("Generate Solid Cube")):
+		voxel_terrain.create_solid_cube_SVO();
+		voxel_terrain.mesh_needs_generated = true
+	if(ImGui.Button("Generate Noise Voxels")):
+		voxel_terrain.create_noise_terrain_SVO();
+		voxel_terrain.mesh_needs_generated = true
+	var data_array: Array = [voxel_terrain.noise_voxel_spawn_threshold]
+	if(ImGui.SliderFloat("Voxel Noise Threshold", data_array, -1.0, 1.0)):
+	# if(ImGui.InputFloat("Voxel Noise Threshold", data_array)):
+		voxel_terrain.noise_voxel_spawn_threshold = data_array[0]
+	data_array = [voxel_terrain.noise_type]
+	if(ImGui.Combo("Noise Type", data_array, ["Simplex", "Simplex Smooth", "Cellular", "Perlin", "Value Cubic", "Value"])):
+		voxel_terrain.noise_type = data_array[0]
+
+	ImGui.End()

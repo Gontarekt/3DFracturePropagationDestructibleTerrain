@@ -137,6 +137,15 @@ class SparseVoxelOctree
             return node_value;
         }
 
+        void clear_voxels()
+        {
+            for (auto& child : root->children)
+            {
+                child = nullptr;
+            }
+
+        }
+
     private:
 
         void _calculate_max_depth()

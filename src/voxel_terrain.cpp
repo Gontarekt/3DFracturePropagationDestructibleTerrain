@@ -1,4 +1,6 @@
 #include "voxel_terrain.h"
+#include "godot_cpp/classes/fast_noise_lite.hpp"
+#include "godot_cpp/classes/global_constants.hpp"
 #include "voxel_utility.h"
 #include <bitset>
 #include <libmorton/morton.h>
@@ -11,10 +13,30 @@ void VoxelTerrain::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "num_tests_to_run"), "set_num_tests_to_run", "get_num_tests_to_run");
 
 	ClassDB::bind_method(D_METHOD("remove_voxel", "voxel_position"), &VoxelTerrain::remove_voxel);
+	ClassDB::bind_method(D_METHOD("create_noise_terrain_SVO"), &VoxelTerrain::create_noise_terrain_SVO);
+	ClassDB::bind_method(D_METHOD("create_solid_cube_SVO"), &VoxelTerrain::create_solid_cube_SVO);
+
+	ClassDB::bind_method(D_METHOD("get_noise_frequency"), &VoxelTerrain::get_noise_frequency);
+	ClassDB::bind_method(D_METHOD("set_noise_frequency", "new_noise_frequency"), &VoxelTerrain::set_noise_frequency);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "noise_frequency"), "set_noise_frequency", "get_noise_frequency");
+
+	ClassDB::bind_method(D_METHOD("get_noise_type"), &VoxelTerrain::get_noise_type);
+	ClassDB::bind_method(D_METHOD("set_noise_type", "new_noise_type"), &VoxelTerrain::set_noise_type);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "noise_type", PROPERTY_HINT_ENUM, "Simplex,Simplex Smooth, Cellular, Perlin, Value Cubic, Value"),
+	"set_noise_type", "get_noise_type");
+
+	ClassDB::bind_method(D_METHOD("get_noise_voxel_spawn_threshold"), &VoxelTerrain::get_noise_voxel_spawn_threshold);
+	ClassDB::bind_method(D_METHOD("set_noise_voxel_spawn_threshold", "new_noise_voxel_spawn_threshold"), &VoxelTerrain::set_noise_voxel_spawn_threshold);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "noise_voxel_spawn_threshold"), "set_noise_voxel_spawn_threshold", "get_noise_voxel_spawn_threshold");
+
+	ClassDB::bind_method(D_METHOD("get_mesh_needs_generated"), &VoxelTerrain::get_mesh_needs_generated);
+	ClassDB::bind_method(D_METHOD("set_mesh_needs_generated", "new_mesh_needs_generated"), &VoxelTerrain::set_mesh_needs_generated);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "mesh_needs_generated"), "set_mesh_needs_generated", "get_mesh_needs_generated");
 }
 
 VoxelTerrain::VoxelTerrain() : sparse_voxel_octree(terrain_chunk_size), mesh_node(nullptr),
-num_tests_to_run(1), mesh_needs_generated(true), collider_node(nullptr) {
+num_tests_to_run(1), mesh_needs_generated(true), collider_node(nullptr),
+noise_frequency(0.02f), noise_type(FastNoiseLite::NoiseType::TYPE_SIMPLEX), noise_voxel_spawn_threshold(0.2f) {
 
 }
 
@@ -25,7 +47,8 @@ VoxelTerrain::~VoxelTerrain() {
 void VoxelTerrain::_ready()
 {
     morton_code_test();
-    create_solid_cube_SVO();
+    //create_solid_cube_SVO();
+    create_noise_terrain_SVO();
     mesh_node = dynamic_cast<MeshInstance3D*>(get_child(0));
 }
 
@@ -96,6 +119,9 @@ void VoxelTerrain::morton_code_test()
 
 void VoxelTerrain::create_solid_cube_SVO()
 {
+    // Clear Previous Voxels
+    sparse_voxel_octree.clear_voxels();
+
     // NOTE: This breaks if you output too many godot debug statements!
     std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
     for (int x = 0; x < terrain_chunk_size; x++)
@@ -111,6 +137,37 @@ void VoxelTerrain::create_solid_cube_SVO()
     std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
     double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
     UtilityFunctions::print("Terrain Solid Cube generation took: ", elapsed_time, " ms");
+}
+
+void VoxelTerrain::create_noise_terrain_SVO()
+{
+    // Clear Previous Voxels
+    sparse_voxel_octree.clear_voxels();
+
+    Ref<FastNoiseLite> noise_generator;
+    noise_generator.instantiate();
+    noise_generator->set_noise_type(noise_type);
+    noise_generator->set_frequency(noise_frequency);
+
+    // NOTE: This breaks if you output too many godot debug statements!
+    std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
+    for (int x = 0; x < terrain_chunk_size; x++)
+    {
+        for (int y = 0; y < terrain_chunk_size; y++)
+        {
+            for (int z = 0; z < terrain_chunk_size; z++)
+            {
+                float noise_value = noise_generator->get_noise_3d(x, y, z);
+                if (noise_value > noise_voxel_spawn_threshold)
+                {
+                    sparse_voxel_octree.insert_voxel(x,y,z,1);
+                }
+            }
+        }
+    }
+    std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
+    double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+    UtilityFunctions::print("Terrain Noise generation took: ", elapsed_time, " ms");
 }
 
 void VoxelTerrain::generate_mesh()
