@@ -2,6 +2,7 @@
 #include <godot_cpp/variant/Vector3.hpp>
 #include <godot_cpp/variant/Vector3i.hpp>
 #include <vector>
+#include <libmorton/morton.h>
 
 namespace VoxelUtility
 {
@@ -17,6 +18,7 @@ namespace VoxelUtility
     inline int voxel_index_from_position(int width, int height, godot::Vector3 position)
     {
         return (int)(position.x + (position.y * width) + (position.z*width*height));
+        //return libmorton::morton3D_64_encode(position.x,position.y,position.z);
     }
 
     // https://stackoverflow.com/questions/7367770/how-to-flatten-or-index-3d-array-in-1d-array
@@ -28,6 +30,10 @@ namespace VoxelUtility
         int y = temp / width;
         int x = index % width;
         return godot::Vector3(x, y, z);
+
+        // uint_fast32_t x,y,z;
+        // libmorton::morton3D_64_decode(index, x, y, z);
+        // return godot::Vector3(x, y, z);
     }
 
     inline void generate_indices_for_quad(std::vector<int32_t>& indices, const int vertex_offset)
