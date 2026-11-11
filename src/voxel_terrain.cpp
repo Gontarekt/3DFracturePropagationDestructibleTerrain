@@ -63,7 +63,8 @@ void VoxelTerrain::morton_code_test()
      * Seems lib morton will place XYZ from LSB - MSB (so X is LSB and Z is MSB). Also the leftmost sequence of 3 bits is the starting point instead
      * of the 3 bits on the far right of the Morton code integer.
      */
-    int64_t index1 = libmorton::morton3D_64_encode(0,0,0);
+    //int64_t index1 = libmorton::morton3D_64_encode(0,0,0);
+    int64_t index1 = libmorton::morton3D_64_encode(63,63,63);
     // In a 2x2x2 grid I expect this to be right node (x axis) in a 1 depth octree
     // Expected Binary Output: 100
     int64_t index2 = libmorton::morton3D_64_encode(1,0,0);
