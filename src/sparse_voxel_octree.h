@@ -85,7 +85,8 @@ class SparseVoxelOctree
         ~SparseVoxelOctree() = default;
 
         struct Node {
-            virtual ~Node() = default; // Required for it to be polymorphic
+            //virtual ~Node() = default; // Required for it to be polymorphic
+            bool is_leaf = false;
         };
 
         struct Branch : public Node {
@@ -95,6 +96,7 @@ class SparseVoxelOctree
 
         struct Leaf : public Node {
             // Reduces cache misses by using an array at the second-to-final depth
+            Leaf(){is_leaf=true;}
             std::array<int8_t, 8> data{};
         };
 
@@ -156,16 +158,18 @@ class SparseVoxelOctree
             if (node == nullptr) { return 0; }
 
             size_t total = 0;
-            if (auto branch = dynamic_cast<const Branch*>(node))
+            if (!node->is_leaf)
             {
+                const Branch* branch = static_cast<const Branch*>(node);
                 total += sizeof(*branch);
                 for (const auto& child : branch->children)
                 {
                     total += _get_num_bytes_in_memory_of_node(child.get());
                 }
             }
-            else if (auto leaf = dynamic_cast<const Leaf*>(node))
+            else
             {
+                const Leaf* leaf = static_cast<const Leaf*>(node);
                 total += sizeof(*leaf);
             }
             return total;
@@ -201,7 +205,7 @@ class SparseVoxelOctree
              */
 
             Node* current_node = root.get();
-            for (int i = 3 * (_max_depth-1); i >= 0; i-=3)
+            for (int i = 3 * (_max_depth-1); i >= MORTON_CODE_OFFSET_AT_MAXIMUM_DEPTH; i-=3)
             {
                 uint_fast8_t node_index = (octree_index >> i) & 0b111;
 
@@ -214,7 +218,7 @@ class SparseVoxelOctree
 
                 // NOTE: Since we know what type a node is going to be at any given point,
                 // use static_cast to avoid the overhead of dynamic cast!
-                if (i == 0)
+                if (i == MORTON_CODE_OFFSET_AT_MAXIMUM_DEPTH)
                 {
                     #ifdef DEBUG_SVO
                     godot::UtilityFunctions::print("current node is a leaf, returning data at index");
@@ -266,7 +270,7 @@ class SparseVoxelOctree
              * The loop reads 3 bits at a time which represent the x,y,z of the node using only 1 bit.
              */
             Node* current_node = root.get();
-            for (int i = 3 * (_max_depth-1); i >= 0; i-=3)
+            for (int i = 3 * (_max_depth-1); i >= MORTON_CODE_OFFSET_AT_MAXIMUM_DEPTH; i-=3)
             {
                 // This is simply a 0-7 value to get the index of the child at the current node
                 uint_fast8_t node_index = (octree_index >> i) & 0b111;
@@ -280,7 +284,7 @@ class SparseVoxelOctree
 
                 // NOTE: Since we know what type a node is going to be at any given point,
                 // use static_cast to avoid the overhead of dynamic cast!
-                if (i == 0)
+                if (i == MORTON_CODE_OFFSET_AT_MAXIMUM_DEPTH)
                 {
                     #ifdef DEBUG_SVO
                     godot::UtilityFunctions::print("current node is a leaf, returning data at index");
@@ -314,7 +318,7 @@ class SparseVoxelOctree
 
                         // If this is the pen-ultimate depth, create a leaf node, otherwise branch.
                         // (Remember the final depth will be represented by the data array in the leaf!)
-                        std::unique_ptr<Node> new_child = i == 3
+                        std::unique_ptr<Node> new_child = i == MORTON_CODE_OFFSET_AT_MAXIMUM_DEPTH+3
                             ? static_cast<std::unique_ptr<Node>>(std::make_unique<Leaf>())
                             : static_cast<std::unique_ptr<Node>>(std::make_unique<Branch>());
                         current_node = new_child.get();
@@ -330,4 +334,5 @@ class SparseVoxelOctree
         size_t _max_depth = 1; // Should calculate once after size has been set! Log base of 2 of the size will get maximum depth.
         // Recursivelly traverse the octree to find data (Leaf Nodes)
         std::unique_ptr<Branch> root = std::make_unique<Branch>();
+        static constexpr int MORTON_CODE_OFFSET_AT_MAXIMUM_DEPTH = 0;
 };
