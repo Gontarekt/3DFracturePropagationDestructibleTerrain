@@ -9,9 +9,6 @@
 #pragma once
 #include <godot_cpp/classes/mesh_instance3d.hpp>
 #include <godot_cpp/classes/collision_shape3d.hpp>
-#include "godot_cpp/classes/node.hpp"
-#include "godot_cpp/classes/object.hpp"
-#include "godot_cpp/variant/vector3.hpp"
 #include "voxel_utility.h"
 
 // This binds all properties and methods defined in VoxelNode to Godot.
