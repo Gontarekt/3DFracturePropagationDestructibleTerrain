@@ -13,12 +13,12 @@ env = SConscript("godot-cpp/SConstruct")
 
 # Configures the 'src' directory as a source for header files.
 env.Append(CPPPATH=[
-    "src/",
-    "libmorton-main/include/"
+    "gdextension-source/",
+    "external/libmorton-main/include/"
     ])
 
 # Collects all .cpp files in the 'src' folder as compile targets.
-sources = Glob("src/*.cpp")
+sources = Glob("gdextension-source/*.cpp")
 
 # The filename for the dynamic library for this GDExtension.
 # $SHLIBPREFIX is a platform specific prefix for the dynamic library ('lib' on Unix, '' on Windows).
@@ -30,7 +30,7 @@ lib_filename = "{}gdexample{}{}".format(env.subst('$SHLIBPREFIX'), env["suffix"]
 
 # Creates a SCons target for the path with our sources.
 library = env.SharedLibrary(
-    "project/bin/{}".format(lib_filename),
+    "godot-project/bin/{}".format(lib_filename),
     source=sources,
 )
 
