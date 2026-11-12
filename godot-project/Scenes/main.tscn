@@ -7,8 +7,6 @@
 ambient_light_color = Color(1, 1, 1, 1)
 ambient_light_energy = 2.85
 
-[sub_resource type="ArrayMesh" id="ArrayMesh_bo1nx"]
-
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bo1nx"]
 albedo_color = Color(1, 0, 1, 1)
 
@@ -18,12 +16,8 @@ material = SubResource("StandardMaterial3D_bo1nx")
 [sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_bo1nx"]
 points = PackedVector3Array(0.5, 0.5, 0.5, 0.5, 0.5, -0.5, -0.5, 0.5, 0.5, 0.5, -0.5, 0.5, 0.5, -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, -0.5)
 
-[sub_resource type="ArrayMesh" id="ArrayMesh_8gbba"]
-
 [node name="Node3D" type="Node3D" unique_id=845366058 node_paths=PackedStringArray("voxel_terrain")]
 script = ExtResource("1_bo1nx")
-ray_one_collision_per_cast = null
-debug_draw_mode = null
 voxel_terrain = NodePath("VoxelTerrain")
 
 [node name="Core" type="Node3D" parent="." unique_id=477913743]
@@ -38,13 +32,6 @@ environment = SubResource("Environment_7dm0k")
 transform = Transform3D(1, 0, 0, 0, 0.9416293, 0.33665156, 0, -0.33665156, 0.9416293, 0, 1.714189, 1.998418)
 script = ExtResource("1_jjgbg")
 
-[node name="VoxelCube" type="VoxelCube" parent="." unique_id=1475345895]
-size = Vector3i(64, 64, 64)
-transform = Transform3D(0.05, 0, 0, 0, 0.05, 0, 0, 0, 0.05, -0.0013208389, 0, -7.452941)
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="VoxelCube" unique_id=1295143250]
-mesh = SubResource("ArrayMesh_bo1nx")
-
 [node name="ReferenceObject" type="StaticBody3D" parent="." unique_id=39155869]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.266645, 0.17655325, -3.9253254)
 
@@ -54,9 +41,10 @@ mesh = SubResource("BoxMesh_7dm0k")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="ReferenceObject" unique_id=815814952]
 shape = SubResource("ConvexPolygonShape3D_bo1nx")
 
+[node name="VoxelCube" type="VoxelCube" parent="." unique_id=1475345895]
+size = Vector3i(64, 64, 64)
+transform = Transform3D(0.05, 0, 0, 0, 0.05, 0, 0, 0, 0.05, -0.0013208389, 0, -7.452941)
+
 [node name="VoxelTerrain" type="VoxelTerrain" parent="." unique_id=1506125266]
 noise_voxel_spawn_threshold = 0.1
 transform = Transform3D(0.05, 0, 0, 0, 0.05, 0, 0, 0, 0.05, -9.413542, 0, -9.716253)
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="VoxelTerrain" unique_id=864488893]
-mesh = SubResource("ArrayMesh_8gbba")

@@ -1,33 +1,27 @@
 #include "voxel_cube.h"
-#include <cstdint>
-#include <godot_cpp/core/class_db.hpp>
-#include <godot_cpp/core/memory.hpp>
-#include <godot_cpp/core/defs.hpp>
-#include <memory>
-#include <vector>
-#include <chrono>
 
 using namespace godot;
 
+
 void VoxelCube::_bind_methods() {
+    BIND_VOXEL_NODE_PROPERTIES(VoxelCube);
+
 	ClassDB::bind_method(D_METHOD("get_size"), &VoxelCube::get_size);
 	// Ideally I have a way to make the godot property always have a value of 1 or greater.
 	ClassDB::bind_method(D_METHOD("set_size", "new_size"), &VoxelCube::set_size);
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3I, "size"), "set_size", "get_size");
 
-	ClassDB::bind_method(D_METHOD("get_num_tests_to_run"), &VoxelCube::get_num_tests_to_run);
-	ClassDB::bind_method(D_METHOD("set_num_tests_to_run", "new_num_tests_to_run"), &VoxelCube::set_num_tests_to_run);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "num_tests_to_run"), "set_num_tests_to_run", "get_num_tests_to_run");
-
 	ClassDB::bind_method(D_METHOD("get_mesh_generation_type"), &VoxelCube::get_mesh_generation_type);
 	ClassDB::bind_method(D_METHOD("set_mesh_generation_type", "new_mesh_generation_type"), &VoxelCube::set_mesh_generation_type);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "mesh_generation_type", PROPERTY_HINT_ENUM, "Triangle Strip Quad,Triangle List Quad,Culling Voxel Mesh"), "set_mesh_generation_type", "get_mesh_generation_type");
-
-	ClassDB::bind_method(D_METHOD("remove_voxel", "voxel_position"), &VoxelCube::remove_voxel);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "mesh_generation_type", PROPERTY_HINT_ENUM,
+	    "Triangle Strip Quad,Triangle List Quad,Culling Voxel Mesh"), "set_mesh_generation_type", "get_mesh_generation_type");
 }
 
-VoxelCube::VoxelCube() : _size(Vector3i(1,1,1)), _mesh_node(nullptr), _num_voxels(1),
-_num_tests_to_run(1), _mesh_needs_generated(true), _mesh_generation_type(MeshGenerationType::culling_voxel_mesh), _collider_node(nullptr)
+
+VoxelCube::VoxelCube() :
+_size(Vector3i(1,1,1)),
+_num_voxels(1),
+_mesh_generation_type(MeshGenerationType::culling_voxel_mesh)
 {
 
 }
@@ -45,6 +39,8 @@ VoxelCube::~VoxelCube()
 
 void VoxelCube::_ready()
 {
+    _initialise_nodes(this);
+
     // Generate the voxel array
     _num_voxels = _size.x*_size.y*_size.z;
 
@@ -58,14 +54,12 @@ void VoxelCube::_ready()
     if (_voxels) {
         UtilityFunctions::print("Voxel array size: ", _voxels->size());
     }
-
-    _mesh_node = dynamic_cast<MeshInstance3D*>(get_child(0));
 }
 
 
 void VoxelCube::_process(double delta)
 {
-    _generate_mesh();
+    _process_geometry_updates();
 }
 
 
@@ -98,13 +92,6 @@ void VoxelCube::set_size(const Vector3i new_size)
 }
 
 
-void VoxelCube::set_num_tests_to_run(const int new_num_tests_to_run)
-{
-    _num_tests_to_run = new_num_tests_to_run;
-    _num_tests_to_run = std::max(_num_tests_to_run, 1);
-}
-
-
 //////////////////
 // Mesh Generation
 
@@ -117,7 +104,7 @@ void VoxelCube::_generate_mesh()
 
     UtilityFunctions::print("\nGenerating VoxelCube Mesh");
     _timings.clear();
-    for (int i = 0; i < _num_tests_to_run; i++)
+    for (int i = 0; i < _num_mesh_generation_tests_to_run; i++)
     {
         std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
         if (_mesh_generation_type == MeshGenerationType::triangle_strip_quad){
@@ -134,7 +121,7 @@ void VoxelCube::_generate_mesh()
         double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
         _timings.push_back(elapsed_time);
         // To prevent overflow of the debug output, don't output for every test if testing a lot of iterations.
-        if (_num_tests_to_run < 500)
+        if (_num_mesh_generation_tests_to_run < 500)
         {
             UtilityFunctions::print("VoxelCube mesh generation took ", elapsed_time, " ms");
         }
@@ -148,11 +135,7 @@ void VoxelCube::_generate_mesh()
     UtilityFunctions::print("VoxelCube mesh generation took an average of ", average_time, " ms");
 
     _mesh_needs_generated = false;
-    std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
-    _generate_collider();
-    std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
-    double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
-    UtilityFunctions::print("VoxelCube collider generation took ", elapsed_time, " ms");
+    _collider_needs_generated = true;
 }
 
 
@@ -496,6 +479,9 @@ void VoxelCube::_generate_voxel_mesh()
 void VoxelCube::_generate_collider()
 {
     if (!_mesh_node) { return; }
+
+    std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
+
     // Note This seems to create a static body child, I need it only create a collider and under the same parent
     //mesh_node->create_convex_collision();
     _mesh_node->create_trimesh_collision();
@@ -508,4 +494,8 @@ void VoxelCube::_generate_collider()
     _collider_node = dynamic_cast<CollisionShape3D*>(_mesh_node->get_child(0)->get_child(0));
     _collider_node->reparent(this);
     _mesh_node->get_child(0)->queue_free(); // Remove the static body
+
+    std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
+    double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+    UtilityFunctions::print("VoxelCube collider generation took ", elapsed_time, " ms");
 }

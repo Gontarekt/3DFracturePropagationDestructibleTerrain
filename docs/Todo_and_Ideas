@@ -1,0 +1,11 @@
+## TODO
+
+- Create VoxelObject class for generic Voxel Vector stored grids, it should inherit Godot's RigidBody node
+- Setup chunks for VoxelTerrain:
+Chunks can be stored in an unordered_map based on position. Positions will simply be in increments of 1, 
+e.g. (0,0,0) (1,0,0) (2,0,0). To get the actual world position the position vectors would then be multiplied
+by the size of the chunks. E.g. for 64x64x64 chunks, the positions become (0,0,0) (64,0,0) (128,0,0).
+- Flood-Filled connected-component algorithm for extracting voxel grids from terrain
+- VoxelObject generation from extracted voxel grids
+
+## IDEAS

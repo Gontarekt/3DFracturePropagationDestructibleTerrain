@@ -1,19 +1,17 @@
 #include "voxel_terrain.h"
 #include "godot_cpp/classes/fast_noise_lite.hpp"
 #include "godot_cpp/classes/global_constants.hpp"
-#include "voxel_utility.h"
-#include <bitset>
 #include <libmorton/morton.h>
+#include <bitset>
+
 
 using namespace godot;
 
+
 void VoxelTerrain::_bind_methods()
 {
-    ClassDB::bind_method(D_METHOD("get_num_tests_to_run"), &VoxelTerrain::get_num_tests_to_run);
-	ClassDB::bind_method(D_METHOD("set_num_tests_to_run", "new_num_tests_to_run"), &VoxelTerrain::set_num_tests_to_run);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "num_tests_to_run"), "set_num_tests_to_run", "get_num_tests_to_run");
+    BIND_VOXEL_NODE_PROPERTIES(VoxelTerrain);
 
-	ClassDB::bind_method(D_METHOD("remove_voxel", "voxel_position"), &VoxelTerrain::remove_voxel);
 	ClassDB::bind_method(D_METHOD("create_noise_terrain_SVO"), &VoxelTerrain::create_noise_terrain_SVO);
 	ClassDB::bind_method(D_METHOD("create_solid_cube_SVO"), &VoxelTerrain::create_solid_cube_SVO);
 
@@ -29,16 +27,15 @@ void VoxelTerrain::_bind_methods()
 	ClassDB::bind_method(D_METHOD("get_noise_voxel_spawn_threshold"), &VoxelTerrain::get_noise_voxel_spawn_threshold);
 	ClassDB::bind_method(D_METHOD("set_noise_voxel_spawn_threshold", "new_noise_voxel_spawn_threshold"), &VoxelTerrain::set_noise_voxel_spawn_threshold);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "noise_voxel_spawn_threshold"), "set_noise_voxel_spawn_threshold", "get_noise_voxel_spawn_threshold");
-
-	ClassDB::bind_method(D_METHOD("get_mesh_needs_generated"), &VoxelTerrain::get_mesh_needs_generated);
-	ClassDB::bind_method(D_METHOD("set_mesh_needs_generated", "new_mesh_needs_generated"), &VoxelTerrain::set_mesh_needs_generated);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "mesh_needs_generated"), "set_mesh_needs_generated", "get_mesh_needs_generated");
 }
 
 
-VoxelTerrain::VoxelTerrain() : sparse_voxel_octree(terrain_chunk_size), mesh_node(nullptr),
-num_tests_to_run(1), mesh_needs_generated(true), collider_node(nullptr),
-noise_frequency(0.02f), noise_type(FastNoiseLite::NoiseType::TYPE_SIMPLEX), noise_voxel_spawn_threshold(0.2f) {
+VoxelTerrain::VoxelTerrain() :
+sparse_voxel_octree(terrain_chunk_size),
+_noise_frequency(0.02f),
+_noise_type(FastNoiseLite::NoiseType::TYPE_SIMPLEX),
+_noise_voxel_spawn_threshold(0.2f)
+{
 
 }
 
@@ -54,14 +51,14 @@ VoxelTerrain::~VoxelTerrain() {
 
 void VoxelTerrain::_ready()
 {
+    _initialise_nodes(this);
     create_noise_terrain_SVO();
-    mesh_node = dynamic_cast<MeshInstance3D*>(get_child(0));
 }
 
 
 void VoxelTerrain::_process(double delta)
 {
-    _generate_mesh();
+    _process_geometry_updates();
 }
 
 
@@ -73,7 +70,7 @@ void VoxelTerrain::remove_voxel(Vector3 voxel_position)
 {
     UtilityFunctions::print("VoxelTerrain remove_voxel()");
     sparse_voxel_octree.insert_voxel(voxel_position.x, voxel_position.y, voxel_position.z, 0);
-    mesh_needs_generated = true;
+    _mesh_needs_generated = true;
 }
 
 
@@ -108,8 +105,8 @@ void VoxelTerrain::create_noise_terrain_SVO()
 
     Ref<FastNoiseLite> noise_generator;
     noise_generator.instantiate();
-    noise_generator->set_noise_type(noise_type);
-    noise_generator->set_frequency(noise_frequency);
+    noise_generator->set_noise_type(_noise_type);
+    noise_generator->set_frequency(_noise_frequency);
 
     // NOTE: This breaks if you output too many godot debug statements!
     std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
@@ -120,7 +117,7 @@ void VoxelTerrain::create_noise_terrain_SVO()
             for (int z = 0; z < terrain_chunk_size; z++)
             {
                 float noise_value = noise_generator->get_noise_3d(x, y, z);
-                if (noise_value > noise_voxel_spawn_threshold)
+                if (noise_value > _noise_voxel_spawn_threshold)
                 {
                     sparse_voxel_octree.insert_voxel(x,y,z,1);
                 }
@@ -150,11 +147,7 @@ void VoxelTerrain::generate_bodies_from_disconnected_voxels()
 // Getters & Setters
 
 
-void VoxelTerrain::set_num_tests_to_run(const int new_num_tests_to_run)
-{
-    num_tests_to_run = new_num_tests_to_run;
-    num_tests_to_run = std::max(num_tests_to_run, 1);
-}
+// Nothing yet
 
 
 ////////////////////
@@ -225,13 +218,13 @@ void VoxelTerrain::_morton_code_test()
 
 void VoxelTerrain::_generate_mesh()
 {
-    if (!mesh_node || !mesh_needs_generated) { return; }
+    if (!_mesh_node || !_mesh_needs_generated) { return; }
 
     /// Procedurally generate voxel mesh from voxel grid
 
     UtilityFunctions::print("\nGenerating VoxelTerrain Mesh");
-    timings.clear();
-    for (int i = 0; i < num_tests_to_run; i++)
+    _timings.clear();
+    for (int i = 0; i < _num_mesh_generation_tests_to_run; i++)
     {
         std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
 
@@ -239,27 +232,23 @@ void VoxelTerrain::_generate_mesh()
 
         std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
         double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
-        timings.push_back(elapsed_time);
+        _timings.push_back(elapsed_time);
         // To prevent overflow of the debug output, don't output for every test if testing a lot of iterations.
-        if (num_tests_to_run < 500)
+        if (_num_mesh_generation_tests_to_run < 500)
         {
             UtilityFunctions::print("VoxelTerrain mesh generation took ", elapsed_time, " ms");
         }
     }
     double average_time = 0.0;
-    for (auto time : timings)
+    for (auto time : _timings)
     {
         average_time += time;
     }
-    average_time /= timings.size();
+    average_time /= _timings.size();
     UtilityFunctions::print("VoxelTerrain mesh generation took an average of ", average_time, " ms");
 
-    mesh_needs_generated = false;
-    std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
-    _generate_collider();
-    std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
-    double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
-    UtilityFunctions::print("VoxelTerrain collider generation took ", elapsed_time, " ms");
+    _mesh_needs_generated = false;
+    _collider_needs_generated = true;
 }
 
 
@@ -270,7 +259,7 @@ void VoxelTerrain::_generate_culling_voxel_mesh()
      * I can check for the existing voxels via traversal of the octree (Although maybe this is actually slower, this is something to test)
      */
 
-    if (!mesh_node) { return;}
+    if (!_mesh_node) { return;}
 
     //// VERTICES
 
@@ -456,7 +445,7 @@ void VoxelTerrain::_generate_culling_voxel_mesh()
 
     /// Create mesh from Surface Array
 
-    Ref<Mesh> mesh = mesh_node->get_mesh();
+    Ref<Mesh> mesh = _mesh_node->get_mesh();
     if(ArrayMesh* array_mesh = Object::cast_to<ArrayMesh>(mesh.ptr()))
     {
         array_mesh->clear_surfaces();
@@ -467,19 +456,29 @@ void VoxelTerrain::_generate_culling_voxel_mesh()
 
 void VoxelTerrain::_generate_collider()
 {
-    if (!mesh_node) { return; }
+    // TODO: Use the collision node I generate on _ready() and procedurally generate the mesh myself
+    // Can hopefully use the same algorithm as mesh generation and that may be way faster than trimesh generation done by godot.
+
+    if (!_mesh_node) { return; }
+
+    std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
+
     // Note This seems to create a static body child, I need it only create a collider and under the same parent
     //mesh_node->create_convex_collision();
-    mesh_node->create_trimesh_collision();
+    _mesh_node->create_trimesh_collision();
 
     // Temp fix
-    if (collider_node) {
-        collider_node->queue_free();
-        collider_node = nullptr;
+    if (_collider_node) {
+        _collider_node->queue_free();
+        _collider_node = nullptr;
     }
-    collider_node = dynamic_cast<CollisionShape3D*>(mesh_node->get_child(0)->get_child(0));
-    collider_node->reparent(this);
-    mesh_node->get_child(0)->queue_free(); // Remove the static body
+    _collider_node = dynamic_cast<CollisionShape3D*>(_mesh_node->get_child(0)->get_child(0));
+    _collider_node->reparent(this);
+    _mesh_node->get_child(0)->queue_free(); // Remove the static body
+
+    std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
+    double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+    UtilityFunctions::print("VoxelTerrain collider generation took ", elapsed_time, " ms");
 }
 
 

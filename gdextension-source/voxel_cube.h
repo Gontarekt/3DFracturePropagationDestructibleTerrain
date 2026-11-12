@@ -1,11 +1,7 @@
 #pragma once
-#include <godot_cpp/classes/node3d.hpp>
 #include <godot_cpp/classes/static_body3d.hpp>
 #include <godot_cpp/core/math.hpp>
-#include <godot_cpp/classes/mesh_instance3d.hpp>
-#include <godot_cpp/classes/collision_shape3d.hpp>
-#include <vector>
-#include "voxel_utility.h"
+#include "voxel_node.h"
 
 enum MeshGenerationType {
     triangle_strip_quad,
@@ -16,23 +12,15 @@ VARIANT_ENUM_CAST(MeshGenerationType);
 
 namespace godot {
 
-class VoxelCube : public StaticBody3D {
+class VoxelCube : public StaticBody3D, public VoxelNode {
 	GDCLASS(VoxelCube, StaticBody3D)
 
 private:
-   	MeshInstance3D* _mesh_node;
-	CollisionShape3D* _collider_node;
-
 	std::unique_ptr<VoxelUtility::VoxelVector> _voxels;
 	Vector3i _size;
 	int _num_voxels; // Computed from size
 
-	// Represent voxels with a simple integer value, 0 means no voxel, index calculated via helper functions to convert 3D to 1D array.
-	int _num_tests_to_run;
-	// Must set to true if you want the voxel mesh to regenerate
-	bool _mesh_needs_generated;
 	MeshGenerationType _mesh_generation_type;
-	std::vector<double> _timings;
 
 protected:
 	static void _bind_methods();
@@ -41,15 +29,17 @@ public:
 	VoxelCube();
 	~VoxelCube();
 
+	// Godot Functions
+
 	void _ready() override;
 	void _process(double delta) override;
 
-	void remove_voxel(Vector3 voxel_position);
+	// Public Functions
 
-	// GETTERS & SETTERS
+	void remove_voxel(Vector3 voxel_position) override;
 
-	void set_num_tests_to_run(const int new_num_tests_to_run);
-	int get_num_tests_to_run() const { return _num_tests_to_run; }
+	// Getters & Setters
+
 	void set_mesh_generation_type(const MeshGenerationType new_mesh_generation_type) { _mesh_generation_type = new_mesh_generation_type;};
 	MeshGenerationType get_mesh_generation_type() const { return _mesh_generation_type; }
 	void set_size(const Vector3i new_size);
@@ -59,16 +49,13 @@ private:
     // Mesh Generation
     // Example Functions for helping understanding of godots rendering + procedural mesh generation
 
-	void _generate_mesh();
+	void _generate_mesh() override;
 	void _generate_triangle_strip_quad(); // Test function
 	void _generate_triangle_list_quad(); // Test function
 	void _generate_voxel_mesh();
 
+	// Private Functions
 
-	// Other Private Functions
-
-
-	void _generate_collider();
+	void _generate_collider() override;
 };
-
 } // namespace godot
