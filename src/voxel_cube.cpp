@@ -6,7 +6,6 @@
 #include <memory>
 #include <vector>
 #include <chrono>
-#include "voxel_utility.h"
 
 using namespace godot;
 
@@ -27,55 +26,139 @@ void VoxelCube::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("remove_voxel", "voxel_position"), &VoxelCube::remove_voxel);
 }
 
-VoxelCube::VoxelCube() : size(Vector3i(1,1,1)), mesh_node(nullptr), num_voxels(1),
-num_tests_to_run(1), mesh_needs_generated(true), mesh_generation_type(MeshGenerationType::culling_voxel_mesh), collider_node(nullptr)
+VoxelCube::VoxelCube() : _size(Vector3i(1,1,1)), _mesh_node(nullptr), _num_voxels(1),
+_num_tests_to_run(1), _mesh_needs_generated(true), _mesh_generation_type(MeshGenerationType::culling_voxel_mesh), _collider_node(nullptr)
 {
 
 }
+
 
 VoxelCube::~VoxelCube()
 {
 	// Add your cleanup here.
 }
 
+
+//////////////////
+// Godot Functions
+
+
 void VoxelCube::_ready()
 {
     // Generate the voxel array
-    num_voxels = size.x*size.y*size.z;
+    _num_voxels = _size.x*_size.y*_size.z;
 
     std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
-    voxels = std::make_unique<std::vector<uint8_t>>(num_voxels, 1);
+    _voxels = std::make_unique<VoxelUtility::VoxelVector>(_num_voxels, 1);
     std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
     double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
-    UtilityFunctions::print("VoxelCube grid generation took ", elapsed_time, " ms");
-    UtilityFunctions::print("VoxelCube NumBytes: ", sizeof(std::vector<uint8_t>) + (sizeof(uint8_t) * voxels->capacity()));
+    UtilityFunctions::print("\nVoxelCube grid generation took ", elapsed_time, " ms");
+    UtilityFunctions::print("VoxelCube NumBytes: ", sizeof(VoxelUtility::VoxelVector) + (sizeof(VoxelUtility::Voxel) * _voxels->capacity()));
 
-    if (voxels) {
-        UtilityFunctions::print("Voxel array size: ", voxels->size());
+    if (_voxels) {
+        UtilityFunctions::print("Voxel array size: ", _voxels->size());
     }
 
-    mesh_node = dynamic_cast<MeshInstance3D*>(get_child(0));
+    _mesh_node = dynamic_cast<MeshInstance3D*>(get_child(0));
 }
+
 
 void VoxelCube::_process(double delta)
 {
-    generate_mesh();
+    _generate_mesh();
 }
+
+
+///////////////////
+// Public Functions
+
+
+void VoxelCube::remove_voxel(Vector3 voxel_position)
+{
+    UtilityFunctions::print("VoxelCube remove_voxel()");
+    int voxel_index = VoxelUtility::voxel_index_from_position(_size.x, _size.y, voxel_position);
+    _voxels->at(voxel_index) = 0;
+    _mesh_needs_generated = true;
+}
+
+
+////////////////////
+// Getters & Setters
+
 
 void VoxelCube::set_size(const Vector3i new_size)
 {
     // Ensure no negative values
-    size.x = std::max(new_size.x, 1);
-    size.y = std::max(new_size.y, 1);
-    size.z = std::max(new_size.z, 1);
-    num_voxels = size.x*size.y*size.z;
-    voxels = std::make_unique<std::vector<uint8_t>>(num_voxels, 1);
-    mesh_needs_generated = true;
+    _size.x = std::max(new_size.x, 1);
+    _size.y = std::max(new_size.y, 1);
+    _size.z = std::max(new_size.z, 1);
+    _num_voxels = _size.x*_size.y*_size.z;
+    _voxels = std::make_unique<VoxelUtility::VoxelVector>(_num_voxels, 1);
+    _mesh_needs_generated = true;
 }
 
-void VoxelCube::generate_triangle_strip_quad()
+
+void VoxelCube::set_num_tests_to_run(const int new_num_tests_to_run)
 {
-    if (!mesh_node) { return;}
+    _num_tests_to_run = new_num_tests_to_run;
+    _num_tests_to_run = std::max(_num_tests_to_run, 1);
+}
+
+
+//////////////////
+// Mesh Generation
+
+
+void VoxelCube::_generate_mesh()
+{
+    if (!_mesh_node || !_mesh_needs_generated) { return; }
+
+    /// Procedurally generate voxel mesh from voxel grid
+
+    UtilityFunctions::print("\nGenerating VoxelCube Mesh");
+    _timings.clear();
+    for (int i = 0; i < _num_tests_to_run; i++)
+    {
+        std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
+        if (_mesh_generation_type == MeshGenerationType::triangle_strip_quad){
+            _generate_triangle_strip_quad();
+        }
+        else if (_mesh_generation_type == MeshGenerationType::triangle_list_quad){
+            _generate_triangle_list_quad();
+        }
+        else if (_mesh_generation_type == MeshGenerationType::culling_voxel_mesh)
+        {
+            _generate_voxel_mesh();
+        }
+        std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
+        double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+        _timings.push_back(elapsed_time);
+        // To prevent overflow of the debug output, don't output for every test if testing a lot of iterations.
+        if (_num_tests_to_run < 500)
+        {
+            UtilityFunctions::print("VoxelCube mesh generation took ", elapsed_time, " ms");
+        }
+    }
+    double average_time = 0.0;
+    for (auto time : _timings)
+    {
+        average_time += time;
+    }
+    average_time /= _timings.size();
+    UtilityFunctions::print("VoxelCube mesh generation took an average of ", average_time, " ms");
+
+    _mesh_needs_generated = false;
+    std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
+    _generate_collider();
+    std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
+    double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+    UtilityFunctions::print("VoxelCube collider generation took ", elapsed_time, " ms");
+}
+
+
+void VoxelCube::_generate_triangle_strip_quad()
+{
+    if (!_mesh_node) { return;}
 
     std::vector<Vector3> vertices_vector;
     PackedVector3Array vertices;
@@ -122,7 +205,7 @@ void VoxelCube::generate_triangle_strip_quad()
     surface_array[(int)Mesh::ArrayType::ARRAY_TEX_UV] = uvs;
     surface_array[(int)Mesh::ArrayType::ARRAY_NORMAL] = normals;
 
-    Ref<Mesh> mesh = mesh_node->get_mesh();
+    Ref<Mesh> mesh = _mesh_node->get_mesh();
     if(ArrayMesh* array_mesh = Object::cast_to<ArrayMesh>(mesh.ptr()))
     {
         array_mesh->clear_surfaces();
@@ -130,9 +213,10 @@ void VoxelCube::generate_triangle_strip_quad()
     }
 }
 
-void VoxelCube::generate_triangle_list_quad()
+
+void VoxelCube::_generate_triangle_list_quad()
 {
-     if (!mesh_node) { return;}
+     if (!_mesh_node) { return;}
 
      std::vector<Vector3> vertices_vector;
      PackedVector3Array vertices;
@@ -196,7 +280,7 @@ void VoxelCube::generate_triangle_list_quad()
      surface_array[(int)Mesh::ArrayType::ARRAY_INDEX] = indices; // Not needed with triangle strip
 
      //Ref<ArrayMesh> mesh = mesh_node->get_mesh(); // This works but is unsafe, crashes if mesh is not an ArrayMesh.
-     Ref<Mesh> mesh = mesh_node->get_mesh();
+     Ref<Mesh> mesh = _mesh_node->get_mesh();
      if(ArrayMesh* array_mesh = Object::cast_to<ArrayMesh>(mesh.ptr()))
      {
          array_mesh->clear_surfaces();
@@ -204,60 +288,12 @@ void VoxelCube::generate_triangle_list_quad()
      }
 }
 
-void VoxelCube::set_num_tests_to_run(const int new_num_tests_to_run)
+
+void VoxelCube::_generate_voxel_mesh()
 {
-    num_tests_to_run = new_num_tests_to_run;
-    num_tests_to_run = std::max(num_tests_to_run, 1);
-}
+    // NOTE: Godot has a clockwise rendering order
 
-void VoxelCube::generate_mesh()
-{
-    if (!mesh_node || !mesh_needs_generated) { return; }
-
-    /// Procedurally generate voxel mesh from voxel grid
-
-    timings.clear();
-    for (int i = 0; i < num_tests_to_run; i++)
-    {
-        std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
-        if (mesh_generation_type == MeshGenerationType::triangle_strip_quad){
-            generate_triangle_strip_quad();
-        }
-        else if (mesh_generation_type == MeshGenerationType::triangle_list_quad){
-            generate_triangle_list_quad();
-        }
-        else if (mesh_generation_type == MeshGenerationType::culling_voxel_mesh)
-        {
-            generate_voxel_mesh();
-        }
-        std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
-        double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
-        timings.push_back(elapsed_time);
-        // To prevent overflow of the debug output, don't output for every test if testing a lot of iterations.
-        if (num_tests_to_run < 500)
-        {
-            UtilityFunctions::print("VoxelCube mesh generation took ", elapsed_time, " ms");
-        }
-    }
-    double average_time = 0.0;
-    for (auto time : timings)
-    {
-        average_time += time;
-    }
-    average_time /= timings.size();
-    UtilityFunctions::print("VoxelCube mesh generation took an average of ", average_time, " ms");
-
-    mesh_needs_generated = false;
-    std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
-    generate_collider();
-    std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
-    double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
-    UtilityFunctions::print("VoxelCube collider generation took ", elapsed_time, " ms");
-}
-
-void VoxelCube::generate_voxel_mesh()
-{
-    if (!mesh_node) { return;}
+    if (!_mesh_node) { return;}
 
     //// VERTICES
 
@@ -275,16 +311,16 @@ void VoxelCube::generate_voxel_mesh()
     /// Generate vertices per voxel
 
     int vertex_offset = 0;
-    for (int x = 0; x < size.x; x++)
+    for (int x = 0; x < _size.x; x++)
     {
-        for (int y = 0; y < size.y; y++)
+        for (int y = 0; y < _size.y; y++)
         {
-            for (int z = 0; z < size.z; z++)
+            for (int z = 0; z < _size.z; z++)
             {
                 /// Ignore empty voxels
 
-                int index = VoxelUtility::voxel_index_from_position(size.x, size.y, Vector3(x,y,z));
-                if (voxels->at(index) == 0) { continue; }
+                int index = VoxelUtility::voxel_index_from_position(_size.x, _size.y, Vector3(x,y,z));
+                if (_voxels->at(index) == 0) { continue; }
 
                 //// Render voxel faces
                 // Only render faces if the voxel adjacent to that face is empty, otherwise do not draw it (cull the face).
@@ -307,8 +343,8 @@ void VoxelCube::generate_voxel_mesh()
                 /// TOP FACE
 
                 int index_adjacent_voxel = -1;
-                if (y+1 < size.y) { index_adjacent_voxel = VoxelUtility::voxel_index_from_position(size.x, size.y, Vector3(x,y + 1,z)); };
-                if (index_adjacent_voxel == -1 || voxels->at(index_adjacent_voxel) == 0)
+                if (y+1 < _size.y) { index_adjacent_voxel = VoxelUtility::voxel_index_from_position(_size.x, _size.y, Vector3(x,y + 1,z)); };
+                if (index_adjacent_voxel == -1 || _voxels->at(index_adjacent_voxel) == 0)
                 {
                     vertices_vector.push_back(front_top_left);
                     vertices_vector.push_back(front_top_right);
@@ -324,8 +360,8 @@ void VoxelCube::generate_voxel_mesh()
                 /// BOTTOM FACE
 
                 index_adjacent_voxel = -1;
-                if (y-1 >= 0) { index_adjacent_voxel = VoxelUtility::voxel_index_from_position(size.x, size.y, Vector3(x,y - 1, z)); };
-                if (index_adjacent_voxel == -1 || voxels->at(index_adjacent_voxel) == 0)
+                if (y-1 >= 0) { index_adjacent_voxel = VoxelUtility::voxel_index_from_position(_size.x, _size.y, Vector3(x,y - 1, z)); };
+                if (index_adjacent_voxel == -1 || _voxels->at(index_adjacent_voxel) == 0)
                 {
                     vertices_vector.push_back(back_bottom_left);
                     vertices_vector.push_back(back_bottom_right);
@@ -341,8 +377,8 @@ void VoxelCube::generate_voxel_mesh()
                 /// LEFT FACE
 
                 index_adjacent_voxel = -1;
-                if (x-1 >= 0) { index_adjacent_voxel = VoxelUtility::voxel_index_from_position(size.x, size.y, Vector3(x-1,y,z)); };
-                if (index_adjacent_voxel == -1 || voxels->at(index_adjacent_voxel) == 0)
+                if (x-1 >= 0) { index_adjacent_voxel = VoxelUtility::voxel_index_from_position(_size.x, _size.y, Vector3(x-1,y,z)); };
+                if (index_adjacent_voxel == -1 || _voxels->at(index_adjacent_voxel) == 0)
                 {
                     vertices_vector.push_back(front_top_left);
                     vertices_vector.push_back(back_top_left);
@@ -358,8 +394,8 @@ void VoxelCube::generate_voxel_mesh()
                 /// RIGHT FACE
 
                 index_adjacent_voxel = -1;
-                if (x+1 < size.x) { index_adjacent_voxel = VoxelUtility::voxel_index_from_position(size.x, size.y, Vector3(x+1,y,z)); };
-                if (index_adjacent_voxel == -1 || voxels->at(index_adjacent_voxel) == 0)
+                if (x+1 < _size.x) { index_adjacent_voxel = VoxelUtility::voxel_index_from_position(_size.x, _size.y, Vector3(x+1,y,z)); };
+                if (index_adjacent_voxel == -1 || _voxels->at(index_adjacent_voxel) == 0)
                 {
                     vertices_vector.push_back(back_top_right);
                     vertices_vector.push_back(front_top_right);
@@ -375,8 +411,8 @@ void VoxelCube::generate_voxel_mesh()
                 /// FRONT FACE
 
                 index_adjacent_voxel = -1;
-                if (z-1 >= 0) { index_adjacent_voxel = VoxelUtility::voxel_index_from_position(size.x, size.y, Vector3(x,y,z-1)); };
-                if (index_adjacent_voxel == -1 || voxels->at(index_adjacent_voxel) == 0)
+                if (z-1 >= 0) { index_adjacent_voxel = VoxelUtility::voxel_index_from_position(_size.x, _size.y, Vector3(x,y,z-1)); };
+                if (index_adjacent_voxel == -1 || _voxels->at(index_adjacent_voxel) == 0)
                 {
                     vertices_vector.push_back(front_top_right);
                     vertices_vector.push_back(front_top_left);
@@ -392,8 +428,8 @@ void VoxelCube::generate_voxel_mesh()
                 /// BACK FACE
 
                 index_adjacent_voxel = -1;
-                if (z+1 < size.z) { index_adjacent_voxel = VoxelUtility::voxel_index_from_position(size.x, size.y, Vector3(x,y,z+1)); };
-                if (index_adjacent_voxel == -1 || voxels->at(index_adjacent_voxel) == 0)
+                if (z+1 < _size.z) { index_adjacent_voxel = VoxelUtility::voxel_index_from_position(_size.x, _size.y, Vector3(x,y,z+1)); };
+                if (index_adjacent_voxel == -1 || _voxels->at(index_adjacent_voxel) == 0)
                 {
                     vertices_vector.push_back(back_top_left);
                     vertices_vector.push_back(back_top_right);
@@ -444,7 +480,7 @@ void VoxelCube::generate_voxel_mesh()
 
     /// Create mesh from Surface Array
 
-    Ref<Mesh> mesh = mesh_node->get_mesh();
+    Ref<Mesh> mesh = _mesh_node->get_mesh();
     if(ArrayMesh* array_mesh = Object::cast_to<ArrayMesh>(mesh.ptr()))
     {
         array_mesh->clear_surfaces();
@@ -452,27 +488,24 @@ void VoxelCube::generate_voxel_mesh()
     }
 }
 
-void VoxelCube::generate_collider()
+
+//////////////////////////
+// Other Private Functions
+
+
+void VoxelCube::_generate_collider()
 {
-    if (!mesh_node) { return; }
+    if (!_mesh_node) { return; }
     // Note This seems to create a static body child, I need it only create a collider and under the same parent
     //mesh_node->create_convex_collision();
-    mesh_node->create_trimesh_collision();
+    _mesh_node->create_trimesh_collision();
 
     // Temp fix
-    if (collider_node) {
-        collider_node->queue_free();
-        collider_node = nullptr;
+    if (_collider_node) {
+        _collider_node->queue_free();
+        _collider_node = nullptr;
     }
-    collider_node = dynamic_cast<CollisionShape3D*>(mesh_node->get_child(0)->get_child(0));
-    collider_node->reparent(this);
-    mesh_node->get_child(0)->queue_free(); // Remove the static body
-}
-
-void VoxelCube::remove_voxel(Vector3 voxel_position)
-{
-    UtilityFunctions::print("VoxelCube remove_voxel()");
-    int voxel_index = VoxelUtility::voxel_index_from_position(size.x, size.y, voxel_position);
-    voxels->at(voxel_index) = 0;
-    mesh_needs_generated = true;
+    _collider_node = dynamic_cast<CollisionShape3D*>(_mesh_node->get_child(0)->get_child(0));
+    _collider_node->reparent(this);
+    _mesh_node->get_child(0)->queue_free(); // Remove the static body
 }

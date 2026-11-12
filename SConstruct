@@ -6,7 +6,7 @@ import sys
 # https://scons.org/documentation.html
 
 env = Environment(tools=['compilation_db'])
-env.CompilationDatabase()
+#env.CompilationDatabase()
 
 # This lets SCons know that we're using godot-cpp, from the godot-cpp folder.
 env = SConscript("godot-cpp/SConstruct")

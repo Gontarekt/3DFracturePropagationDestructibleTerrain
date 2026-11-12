@@ -7,7 +7,8 @@
 
 using namespace godot;
 
-void VoxelTerrain::_bind_methods() {
+void VoxelTerrain::_bind_methods()
+{
     ClassDB::bind_method(D_METHOD("get_num_tests_to_run"), &VoxelTerrain::get_num_tests_to_run);
 	ClassDB::bind_method(D_METHOD("set_num_tests_to_run", "new_num_tests_to_run"), &VoxelTerrain::set_num_tests_to_run);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "num_tests_to_run"), "set_num_tests_to_run", "get_num_tests_to_run");
@@ -34,88 +35,47 @@ void VoxelTerrain::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "mesh_needs_generated"), "set_mesh_needs_generated", "get_mesh_needs_generated");
 }
 
+
 VoxelTerrain::VoxelTerrain() : sparse_voxel_octree(terrain_chunk_size), mesh_node(nullptr),
 num_tests_to_run(1), mesh_needs_generated(true), collider_node(nullptr),
 noise_frequency(0.02f), noise_type(FastNoiseLite::NoiseType::TYPE_SIMPLEX), noise_voxel_spawn_threshold(0.2f) {
 
 }
 
+
 VoxelTerrain::~VoxelTerrain() {
 
 }
 
+
+//////////////////
+// Godot Functions
+
+
 void VoxelTerrain::_ready()
 {
-    morton_code_test();
-    //create_solid_cube_SVO();
     create_noise_terrain_SVO();
     mesh_node = dynamic_cast<MeshInstance3D*>(get_child(0));
 }
 
+
 void VoxelTerrain::_process(double delta)
 {
-    generate_mesh();
+    _generate_mesh();
 }
 
-void VoxelTerrain::morton_code_test()
+
+///////////////////
+// Public Functions
+
+
+void VoxelTerrain::remove_voxel(Vector3 voxel_position)
 {
-    /*
-     * Seems lib morton will place XYZ from LSB - MSB (so X is LSB and Z is MSB). Also the leftmost sequence of 3 bits is the starting point instead
-     * of the 3 bits on the far right of the Morton code integer.
-     */
-    int64_t index1 = libmorton::morton3D_64_encode(63,63,63);
-    // In a 2x2x2 grid I expect this to be right node (x axis) in a 1 depth octree
-    // Expected Binary Output: 100
-    int64_t index2 = libmorton::morton3D_64_encode(1,0,0);
-    int64_t index3 = libmorton::morton3D_64_encode(0,1,0);
-    int64_t index4 = libmorton::morton3D_64_encode(0,0,1);
-    int64_t index5 = libmorton::morton3D_64_encode(1,1,1);
-    // Depth 2, Right on X axis then left on X axis:
-    // Result: 001, 000
-    int64_t index6 = libmorton::morton3D_64_encode(2,0,0);
-    // In a 4x4x4 grid, since values are 0-3, with 3 being the furthest point on that axis:
-    // I expect this to be a depth of 2; From Root: Rightmost node on the x axis, From child of root: rightmost node on X. so 100,100
-    // On the Z axis it would be rightmost node then leftmost. so 001, 000
-    // Combined: 101, 001
-    int64_t index7 = libmorton::morton3D_64_encode(3,0,2);
-    // In order:
-    // X: 001, 001, 001, 001
-    // Y: 010, 010, 010, 000
-    // Z: 000, 000, 100, 100
-    // Combined: 011, 011, 111, 101
-    // 3, 3, 7, 5
-    int64_t index8 = libmorton::morton3D_64_encode(15,14,3);
-    for (int i = 3 * (4-1); i >= 0; i-=3)
-    {
-        uint_fast16_t node_index = (index8 >> i) & 0b111;
-         UtilityFunctions::print("Index8 sequence:", std::bitset<64>(node_index).to_string().c_str());
-    }
-    sparse_voxel_octree.insert_voxel(15, 14, 3, 1);
-    //sparse_voxel_octree.insert_voxel(15, 14, 3, 1);
-    //sparse_voxel_octree.insert_voxel(15, 14, 3, 1);
-    sparse_voxel_octree.get_voxel(15,14,3);
-    sparse_voxel_octree.get_voxel(14,14,13);
-    sparse_voxel_octree.get_voxel(0,0,0);
-    //UtilityFunctions::print("Value found in octree at 15, 14, 3: ", sparse_voxel_octree.get_voxel(15,14,13));
-    //UtilityFunctions::print("Value found in octree at 14, 14, 3: ", sparse_voxel_octree.get_voxel(14,14,13));
-    //UtilityFunctions::print("Value found in octree at 0, 0, 0: ", sparse_voxel_octree.get_voxel(0,0,0));
-
-    int64_t index9 = libmorton::morton3D_64_encode(127,127,127);
-    int64_t index10 = libmorton::morton3D_64_encode(6, 8, 9);
-    int64_t index11 = libmorton::morton3D_64_encode(6, 5, 7);
-
-    UtilityFunctions::print("Morton Code 1 : ", std::bitset<64>(index1).to_string().c_str(), " int: ", index1);
-    UtilityFunctions::print("Morton Code 2: ", std::bitset<64>(index2).to_string().c_str(), " int: ", index2);
-    UtilityFunctions::print("Morton Code 3: ", std::bitset<64>(index3).to_string().c_str(), " int: ", index3);
-    UtilityFunctions::print("Morton Code 4: ", std::bitset<64>(index4).to_string().c_str(), " int: ", index4);
-    UtilityFunctions::print("Morton Code 5: ", std::bitset<64>(index5).to_string().c_str(), " int: ", index5);
-    UtilityFunctions::print("Morton Code 6: ", std::bitset<64>(index6).to_string().c_str(), " int: ", index6);
-    UtilityFunctions::print("Morton Code 7: ", std::bitset<64>(index7).to_string().c_str(), " int: ", index7);
-    UtilityFunctions::print("Morton Code 8: ", std::bitset<64>(index8).to_string().c_str(), " int: ", index8);
-    UtilityFunctions::print("Morton Code 9: ", std::bitset<64>(index9).to_string().c_str(), " int: ", index9);
-    UtilityFunctions::print("Morton Code 10: ", std::bitset<64>(index10).to_string().c_str(), " int: ", index10);
-    UtilityFunctions::print("Morton Code 11: ", std::bitset<64>(index11).to_string().c_str(), " int: ", index11);
+    UtilityFunctions::print("VoxelTerrain remove_voxel()");
+    sparse_voxel_octree.insert_voxel(voxel_position.x, voxel_position.y, voxel_position.z, 0);
+    mesh_needs_generated = true;
 }
+
 
 void VoxelTerrain::create_solid_cube_SVO()
 {
@@ -139,6 +99,7 @@ void VoxelTerrain::create_solid_cube_SVO()
     UtilityFunctions::print("Terrain Solid Cube generation took: ", elapsed_time, " ms");
     UtilityFunctions::print("Terrain NumBytes: ", sparse_voxel_octree.get_total_bytes_in_memory());
 }
+
 
 void VoxelTerrain::create_noise_terrain_SVO()
 {
@@ -168,22 +129,113 @@ void VoxelTerrain::create_noise_terrain_SVO()
     }
     std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
     double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
-    UtilityFunctions::print("Terrain Noise generation took: ", elapsed_time, " ms");
+    UtilityFunctions::print("\nTerrain Noise generation took: ", elapsed_time, " ms");
     UtilityFunctions::print("Terrain NumBytes: ", sparse_voxel_octree.get_total_bytes_in_memory());
 }
 
-void VoxelTerrain::generate_mesh()
+
+void VoxelTerrain::generate_bodies_from_disconnected_voxels()
+{
+    // Find and remove the disconnected voxels from the terrain's voxel grid
+    std::vector<std::pair<VoxelUtility::VoxelVector, godot::Vector3i>> disconnected_voxel_grids = _extract_disconnected_voxel_groups();
+
+    // Create a new RigidBody Voxel Grid in the scene for each disconnected voxel grid.
+    // Need to position it relative to the terrain chunk where the voxel grid originated from.
+
+    /// TODO
+}
+
+
+////////////////////
+// Getters & Setters
+
+
+void VoxelTerrain::set_num_tests_to_run(const int new_num_tests_to_run)
+{
+    num_tests_to_run = new_num_tests_to_run;
+    num_tests_to_run = std::max(num_tests_to_run, 1);
+}
+
+
+////////////////////
+// Private Functions
+
+
+void VoxelTerrain::_morton_code_test()
+{
+    /*
+     * Seems lib morton will place XYZ from LSB - MSB (so X is LSB and Z is MSB). Also the leftmost sequence of 3 bits is the starting point instead
+     * of the 3 bits on the far right of the Morton code integer.
+     */
+    int64_t index1 = libmorton::morton3D_64_encode(63,63,63);
+    // In a 2x2x2 grid I expect this to be right node (x axis) in a 1 depth octree
+    // Expected Binary Output: 100
+    int64_t index2 = libmorton::morton3D_64_encode(1,0,0);
+    int64_t index3 = libmorton::morton3D_64_encode(0,1,0);
+    int64_t index4 = libmorton::morton3D_64_encode(0,0,1);
+    int64_t index5 = libmorton::morton3D_64_encode(1,1,1);
+    // Depth 2, Right on X axis then left on X axis:
+    // Result: 001, 000
+    int64_t index6 = libmorton::morton3D_64_encode(2,0,0);
+    // In a 4x4x4 grid, since values are 0-3, with 3 being the furthest point on that axis:
+    // I expect this to be a depth of 2; From Root: Rightmost node on the x axis, From child of root: rightmost node on X. so 100,100
+    // On the Z axis it would be rightmost node then leftmost. so 001, 000
+    // Combined: 101, 001
+    int64_t index7 = libmorton::morton3D_64_encode(3,0,2);
+    // In order:
+    // X: 001, 001, 001, 001
+    // Y: 010, 010, 010, 000
+    // Z: 000, 000, 100, 100
+    // Combined: 011, 011, 111, 101
+    // 3, 3, 7, 5
+    int64_t index8 = libmorton::morton3D_64_encode(15,14,3);
+    UtilityFunctions::print("\nIndex8: ", std::bitset<64>(index8).to_string().c_str());
+    for (int i = 3 * (4-1); i >= 0; i-=3)
+    {
+        uint_fast16_t node_index = (index8 >> i) & 0b111;
+         UtilityFunctions::print("Index8 sequence:", std::bitset<64>(node_index).to_string().c_str());
+    }
+    sparse_voxel_octree.insert_voxel(15, 14, 3, 1);
+    //sparse_voxel_octree.insert_voxel(15, 14, 3, 1);
+    //sparse_voxel_octree.insert_voxel(15, 14, 3, 1);
+    sparse_voxel_octree.get_voxel(15,14,3);
+    sparse_voxel_octree.get_voxel(14,14,13);
+    sparse_voxel_octree.get_voxel(0,0,0);
+    //UtilityFunctions::print("Value found in octree at 15, 14, 3: ", sparse_voxel_octree.get_voxel(15,14,13));
+    //UtilityFunctions::print("Value found in octree at 14, 14, 3: ", sparse_voxel_octree.get_voxel(14,14,13));
+    //UtilityFunctions::print("Value found in octree at 0, 0, 0: ", sparse_voxel_octree.get_voxel(0,0,0));
+
+    int64_t index9 = libmorton::morton3D_64_encode(127,127,127);
+    int64_t index10 = libmorton::morton3D_64_encode(6, 8, 9);
+    int64_t index11 = libmorton::morton3D_64_encode(6, 5, 7);
+
+    UtilityFunctions::print("\nMorton Code 1 : ", std::bitset<64>(index1).to_string().c_str(), " int: ", index1);
+    UtilityFunctions::print("Morton Code 2: ", std::bitset<64>(index2).to_string().c_str(), " int: ", index2);
+    UtilityFunctions::print("Morton Code 3: ", std::bitset<64>(index3).to_string().c_str(), " int: ", index3);
+    UtilityFunctions::print("Morton Code 4: ", std::bitset<64>(index4).to_string().c_str(), " int: ", index4);
+    UtilityFunctions::print("Morton Code 5: ", std::bitset<64>(index5).to_string().c_str(), " int: ", index5);
+    UtilityFunctions::print("Morton Code 6: ", std::bitset<64>(index6).to_string().c_str(), " int: ", index6);
+    UtilityFunctions::print("Morton Code 7: ", std::bitset<64>(index7).to_string().c_str(), " int: ", index7);
+    UtilityFunctions::print("Morton Code 8: ", std::bitset<64>(index8).to_string().c_str(), " int: ", index8);
+    UtilityFunctions::print("Morton Code 9: ", std::bitset<64>(index9).to_string().c_str(), " int: ", index9);
+    UtilityFunctions::print("Morton Code 10: ", std::bitset<64>(index10).to_string().c_str(), " int: ", index10);
+    UtilityFunctions::print("Morton Code 11: ", std::bitset<64>(index11).to_string().c_str(), " int: ", index11);
+}
+
+
+void VoxelTerrain::_generate_mesh()
 {
     if (!mesh_node || !mesh_needs_generated) { return; }
 
     /// Procedurally generate voxel mesh from voxel grid
 
+    UtilityFunctions::print("\nGenerating VoxelTerrain Mesh");
     timings.clear();
     for (int i = 0; i < num_tests_to_run; i++)
     {
         std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
 
-        generate_culling_voxel_mesh();
+        _generate_culling_voxel_mesh();
 
         std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
         double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
@@ -204,18 +256,20 @@ void VoxelTerrain::generate_mesh()
 
     mesh_needs_generated = false;
     std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
-    generate_collider();
+    _generate_collider();
     std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
     double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
     UtilityFunctions::print("VoxelTerrain collider generation took ", elapsed_time, " ms");
 }
 
-/*
- * TODO: Make this take advantage of the octree so that it only loops through existing voxels instead of checking every voxel!
- * I can check for the existing voxels via traversal of the octree (Although maybe this is actually slower, this is something to test)
- */
-void VoxelTerrain::generate_culling_voxel_mesh()
+
+void VoxelTerrain::_generate_culling_voxel_mesh()
 {
+    /*
+     * TODO: Make this take advantage of the octree so that it only loops through existing voxels instead of checking every voxel!
+     * I can check for the existing voxels via traversal of the octree (Although maybe this is actually slower, this is something to test)
+     */
+
     if (!mesh_node) { return;}
 
     //// VERTICES
@@ -410,7 +464,8 @@ void VoxelTerrain::generate_culling_voxel_mesh()
     }
 }
 
-void VoxelTerrain::generate_collider()
+
+void VoxelTerrain::_generate_collider()
 {
     if (!mesh_node) { return; }
     // Note This seems to create a static body child, I need it only create a collider and under the same parent
@@ -427,15 +482,8 @@ void VoxelTerrain::generate_collider()
     mesh_node->get_child(0)->queue_free(); // Remove the static body
 }
 
-void VoxelTerrain::set_num_tests_to_run(const int new_num_tests_to_run)
-{
-    num_tests_to_run = new_num_tests_to_run;
-    num_tests_to_run = std::max(num_tests_to_run, 1);
-}
 
-void VoxelTerrain::remove_voxel(Vector3 voxel_position)
+std::vector<std::pair<VoxelUtility::VoxelVector, godot::Vector3i>> VoxelTerrain::_extract_disconnected_voxel_groups()
 {
-    UtilityFunctions::print("VoxelTerrain remove_voxel()");
-    sparse_voxel_octree.insert_voxel(voxel_position.x, voxel_position.y, voxel_position.z, 0);
-    mesh_needs_generated = true;
+    return {}; /// TODO
 }

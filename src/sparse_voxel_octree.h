@@ -63,17 +63,13 @@
  * for sizes of 16 and up.
  */
 
-// NOTE: Remove this later as well as the debug statements to make the code more readable and also not godot dependant.
-//#define DEBUG_SVO
-
-#include "godot_cpp/variant/vector3i.hpp"
-#include <cmath>
+#pragma once
 #include <cstdint>
 #include <memory>
 #include <array>
-#include <vector>
 #include <libmorton/morton.h>
 #include <godot_cpp/classes/node3d.hpp> // For debug prints!
+#include "voxel_utility.h"
 
 class SparseVoxelOctree
 {
@@ -88,250 +84,42 @@ class SparseVoxelOctree
             //virtual ~Node() = default; // Required for it to be polymorphic
             bool is_leaf = false;
         };
-
         struct Branch : public Node {
             // either stores a branch or leaf
             std::array<std::unique_ptr<Node>, 8> children;
         };
-
         struct Leaf : public Node {
-            // Reduces cache misses by using an array at the second-to-final depth
             Leaf(){is_leaf=true;}
-            std::array<int8_t, 8> data{};
+            // Reduces memory usage by storing 8 voxels per leaf instead of creating an additional layer
+            std::array<VoxelUtility::Voxel, 8> data{};
         };
 
-        void insert_voxel(uint_fast32_t x, uint_fast32_t y, uint_fast32_t z, int32_t voxel)
-        {
-            #ifdef DEBUG_SVO
-            godot::UtilityFunctions::print("\nSVO.insert_voxel():");
-            #endif
-
-            int64_t octree_index = _get_index_from_position(x, y, z);
-            int8_t& node_value = _find_or_create_node(octree_index);
-
-            #ifdef DEBUG_SVO
-             godot::UtilityFunctions::print("Node value in SVO at X: ", x, " Y: ", y, " Z: ", z, " was: ", node_value);
-            #endif
-
-            node_value = voxel;
-
-            #ifdef DEBUG_SVO
-            godot::UtilityFunctions::print("Node value in SVO is now: ", node_value);
-            #endif
-        }
-
-        int8_t get_voxel(uint_fast32_t x, uint_fast32_t y, uint_fast32_t z)
-        {
-            #ifdef DEBUG_SVO
-            godot::UtilityFunctions::print("\nSVO.get_voxel():");
-            #endif
-
-            int64_t octree_index = _get_index_from_position(x, y, z);
-            int8_t node_value = _find_node_value(octree_index);
-
-            #ifdef DEBUG_SVO
-            godot::UtilityFunctions::print("Node value found in SVO at : X: ", x, " Y: ", y, " Z: ", z, " is: ", node_value);
-            #endif
-
-            return node_value;
-        }
-
-        void clear_voxels()
-        {
-            for (auto& child : root->children)
-            {
-                child = nullptr;
-            }
-
-        }
-
-        // returns num of bytes
-        size_t get_total_bytes_in_memory()
-        {
-            return _get_num_bytes_in_memory_of_node(root.get());
-        }
+        void insert_voxel(uint_fast32_t x, uint_fast32_t y, uint_fast32_t z, VoxelUtility::Voxel voxel);
+        VoxelUtility::Voxel get_voxel(uint_fast32_t x, uint_fast32_t y, uint_fast32_t z);
+        void clear_voxels();
+        size_t get_total_bytes_in_memory() { return _get_num_bytes_in_memory_of_node(root.get()); }
 
     private:
 
-        size_t _get_num_bytes_in_memory_of_node(const Node* node)
-        {
-            if (node == nullptr) { return 0; }
-
-            size_t total = 0;
-            if (!node->is_leaf)
-            {
-                const Branch* branch = static_cast<const Branch*>(node);
-                total += sizeof(*branch);
-                for (const auto& child : branch->children)
-                {
-                    total += _get_num_bytes_in_memory_of_node(child.get());
-                }
-            }
-            else
-            {
-                const Leaf* leaf = static_cast<const Leaf*>(node);
-                total += sizeof(*leaf);
-            }
-            return total;
-        }
-
-        void _calculate_max_depth()
-        {
-            _max_depth = std::log2(_voxels_per_axis);
-        }
-
+        size_t _get_num_bytes_in_memory_of_node(const Node* node);
+        void _calculate_max_depth();
         // Assuming non-negative coords currently, I store voxels from 0,0,0 to size.x,size.y,size.z.
         // "the most significant bit of lower numbers is lower than the single bit of a greater power of two"
         // E.g. for 0111 which is 7, this will be less than 1000 which is 8.
-        bool _is_voxel_inside_octree(uint_fast32_t x, uint_fast32_t y, uint_fast32_t z)
-        {
-            return (x | y | z) >= _voxels_per_axis;
-        }
-
-        int64_t _get_index_from_position(uint_fast32_t x, uint_fast32_t y, uint_fast32_t z)
-        {
-            /*
-             * 0 bit represents (-) in that axis and 1 bit represent (+) in that axis (E.g. -x to x, or left to right).
-             */
-            return libmorton::morton3D_64_encode(x,y,z);
-        }
+        bool _is_voxel_inside_octree(uint_fast32_t x, uint_fast32_t y, uint_fast32_t z);
+        int64_t _get_index_from_position(uint_fast32_t x, uint_fast32_t y, uint_fast32_t z);
 
         // Traverse the octree until it finds the value of the smallest node at the position interleaved in the index
-        int8_t _find_node_value(int64_t octree_index)
-        {
-            /*
-             * If child of branch is nullptr then no voxels stored,
-             * otherwise if leaf, check if value of data is 0 which then also means no voxel stored.
-             */
-
-            Node* current_node = root.get();
-            for (int i = 3 * (_max_depth-1); i >= MORTON_CODE_OFFSET_AT_MAXIMUM_DEPTH; i-=3)
-            {
-                uint_fast8_t node_index = (octree_index >> i) & 0b111;
-
-                #ifdef DEBUG_SVO
-                godot::UtilityFunctions::print(
-                    "Morton digit: ", node_index,
-                    " Bit position: ", i
-                );
-                #endif
-
-                // NOTE: Since we know what type a node is going to be at any given point,
-                // use static_cast to avoid the overhead of dynamic cast!
-                if (i == MORTON_CODE_OFFSET_AT_MAXIMUM_DEPTH)
-                {
-                    #ifdef DEBUG_SVO
-                    godot::UtilityFunctions::print("current node is a leaf, returning data at index");
-                    #endif
-
-                    // If at the end of the morton code, then you can gaurantee it is a leaf node.
-                    Leaf* leaf = static_cast<Leaf*>(current_node);
-                    return leaf->data[node_index];
-                }
-                else {
-                    // Since we haven't fully read the Morton code yet, we should create new nodes
-                    // where there is a missing node.
-
-                    Branch* branch = static_cast<Branch*>(current_node);
-                    Node* child_node = branch->children[node_index].get();
-                    if (child_node != nullptr)
-                    {
-                        // Node found, traverse it on next pass.
-                        current_node = child_node;
-
-                        #ifdef DEBUG_SVO
-                        godot::UtilityFunctions::print("Child is not nullptr, moving to that node next");
-                        #endif
-                    }
-                    else {
-                        #ifdef DEBUG_SVO
-                        godot::UtilityFunctions::print("Child is nullptr, no voxel at the position, return 0");
-                        #endif
-
-                        // as the branch is nullptr, this means no voxel data is stored at the position
-                        return 0;
-                    }
-                }
-            }
-        }
-
+        VoxelUtility::Voxel _find_node_value(int64_t octree_index);
         // Traverses the Octree to reach the index, creating a leaf node at the exact position in maximum depth if
         // a leaf node doesn't already exist. Returns the value of the leaf node by reference.
-        int8_t& _find_or_create_node(int64_t octree_index)
-        {
-            // Should traverse using the index until it finds a leaf node or has fully read the morton code index
-            // return the data value in the leaf node that the index points to.
-            // Note: You need to determine the maximum depth of the octree to know how much of Morton code to read.
-
-            /*
-             * LibMorton places X as the LSB (right-most bit) and
-             * also places the deepest node index in the LSB part of the Morton Code sequence.
-             * So I need to use the depth to get the left-most point of the morton code.
-             * The loop reads 3 bits at a time which represent the x,y,z of the node using only 1 bit.
-             */
-            Node* current_node = root.get();
-            for (int i = 3 * (_max_depth-1); i >= MORTON_CODE_OFFSET_AT_MAXIMUM_DEPTH; i-=3)
-            {
-                // This is simply a 0-7 value to get the index of the child at the current node
-                uint_fast8_t node_index = (octree_index >> i) & 0b111;
-
-                #ifdef DEBUG_SVO
-                godot::UtilityFunctions::print(
-                    "Morton digit: ", node_index,
-                    " Bit position: ", i
-                );
-                #endif
-
-                // NOTE: Since we know what type a node is going to be at any given point,
-                // use static_cast to avoid the overhead of dynamic cast!
-                if (i == MORTON_CODE_OFFSET_AT_MAXIMUM_DEPTH)
-                {
-                    #ifdef DEBUG_SVO
-                    godot::UtilityFunctions::print("current node is a leaf, returning data at index");
-                    #endif
-
-                    // If at the end of the morton code, then you can gaurantee it is a leaf node.
-                    Leaf* leaf = static_cast<Leaf*>(current_node);
-                    return leaf->data[node_index];
-                }
-                else {
-                    // Since we haven't fully read the Morton code yet, we should create new nodes
-                    // where there is a missing node.
-
-                    Branch* branch = static_cast<Branch*>(current_node);
-                    Node* child_node = branch->children[node_index].get();
-                    if (child_node != nullptr)
-                    {
-                        // Node found, traverse it on next pass.
-                        current_node = child_node;
-
-                        #ifdef DEBUG_SVO
-                        godot::UtilityFunctions::print("Child is not nullptr, moving to that node next");
-                        #endif
-                    }
-                    else {
-                        // Create new node.
-
-                        #ifdef DEBUG_SVO
-                        godot::UtilityFunctions::print("Child is nullptr, creating new node");
-                        #endif
-
-                        // If this is the pen-ultimate depth, create a leaf node, otherwise branch.
-                        // (Remember the final depth will be represented by the data array in the leaf!)
-                        std::unique_ptr<Node> new_child = i == MORTON_CODE_OFFSET_AT_MAXIMUM_DEPTH+3
-                            ? static_cast<std::unique_ptr<Node>>(std::make_unique<Leaf>())
-                            : static_cast<std::unique_ptr<Node>>(std::make_unique<Branch>());
-                        current_node = new_child.get();
-                        branch->children[node_index] = std::move(new_child);
-                    }
-                }
-            }
-            // Prob put an assert here, this line should never be reached.
-        }
+        VoxelUtility::Voxel& _find_or_create_node(int64_t octree_index);
 
     private:
-        int _voxels_per_axis; // Uniform Voxel Size in all axes. Must be a power of 2 for calculations to work!
-        size_t _max_depth = 1; // Should calculate once after size has been set! Log base of 2 of the size will get maximum depth.
+        // Uniform Voxel Size in all axes. Must be a power of 2 for calculations to work!
+        int _voxels_per_axis;
+        // Should calculate once after size has been set! Log base of 2 of the size will get maximum depth.
+        size_t _max_depth = 1;
         // Recursivelly traverse the octree to find data (Leaf Nodes)
         std::unique_ptr<Branch> root = std::make_unique<Branch>();
         static constexpr int MORTON_CODE_OFFSET_AT_MAXIMUM_DEPTH = 0;
