@@ -520,19 +520,16 @@ std::vector<VoxelUtility::VoxelGrid> VoxelTerrain::_flood_filled_connected_compo
      * has been obtained / flood fill is complete. You can't place them into the actual grid until then as you need the
      * grid bounds to index the voxel grid vector.
      */
-    /*
-     * NOTE ISSUE: Current implementation is crashing due to flood fill recursion, possible stack overflow.
-     * It is fine with 5/6 calls, but a 6th call causes a crash.
-     * Additionally, if I have all 6 calls active but change the terrain chunk size to 32 instead of 64, then it is also fine.
-     */
 
+    UtilityFunctions::print("\nFlood fill connected component start");
     std::vector<VoxelUtility::VoxelGrid> extracted_voxel_grids;
     // Store voxels with their position and voxel value in a separate vector as the full grid size
     // isn't known until the flood fill is complete
     std::vector<std::vector<VoxelUtility::ExtractedVoxel>> extracted_voxels;
     std::vector<bool> visited_voxels(terrain_chunk_size*terrain_chunk_size*terrain_chunk_size, false);
-
-    UtilityFunctions::print("\nFlood fill connected component start");
+    // To mitigate stack overflow, instead of recursively flood filling, use a vector of voxel positions
+    // and loop through each one individually.
+    std::vector<std::tuple<int,int,int>> voxels_to_scan;
 
     for (int x = 0; x < terrain_chunk_size; x++)
     {
@@ -552,9 +549,14 @@ std::vector<VoxelUtility::VoxelGrid> VoxelTerrain::_flood_filled_connected_compo
                     Vector3i grid_max_corner = Vector3i(x,y,z);
                     extracted_voxel_grids.emplace_back();
                     extracted_voxels.emplace_back();
-                    _flood_fill(x, y, z, visited_voxels, extracted_voxel_grids.back(),
-                        extracted_voxels.back(), grid_min_corner, grid_max_corner);
-
+                    voxels_to_scan.emplace_back(x,y,z);
+                    while (!voxels_to_scan.empty())
+                    {
+                        auto [scan_x,scan_y,scan_z] = voxels_to_scan.back();
+                        voxels_to_scan.pop_back();
+                        _flood_fill(scan_x, scan_y, scan_z, visited_voxels, extracted_voxel_grids.back(),
+                            extracted_voxels.back(), grid_min_corner, grid_max_corner, voxels_to_scan);
+                    }
                     extracted_voxel_grids.back().offset_in_parent_grid = grid_min_corner;
                     extracted_voxel_grids.back().dimensions = grid_max_corner - grid_min_corner + Vector3i(1, 1, 1);
                 }
@@ -585,7 +587,7 @@ std::vector<VoxelUtility::VoxelGrid> VoxelTerrain::_flood_filled_connected_compo
 
 void VoxelTerrain::_flood_fill(const int x, const int y, const int z, std::vector<bool>& visited_voxels,
     VoxelUtility::VoxelGrid& voxel_grid, std::vector<VoxelUtility::ExtractedVoxel>& extracted_voxels,
-    Vector3i& grid_min_corner, Vector3i& grid_max_corner)
+    Vector3i& grid_min_corner, Vector3i& grid_max_corner, std::vector<std::tuple<int,int,int>>& voxels_to_scan)
 {
     // Boundary check, voxel must be within the parent grid.
     if (x < 0 || y < 0 || z < 0 || x >= terrain_chunk_size || y >= terrain_chunk_size || z >= terrain_chunk_size) { return; }
@@ -611,13 +613,13 @@ void VoxelTerrain::_flood_fill(const int x, const int y, const int z, std::vecto
         grid_min_corner.y = std::min(y, grid_min_corner.y);
         grid_min_corner.z = std::min(z, grid_min_corner.z);
 
-        // Recursively scan in all orthogonal directions
-        _flood_fill(x-1, y, z, visited_voxels, voxel_grid, extracted_voxels, grid_min_corner, grid_max_corner);
-        _flood_fill(x+1, y, z, visited_voxels, voxel_grid, extracted_voxels, grid_min_corner, grid_max_corner);
-        _flood_fill(x, y-1, z, visited_voxels, voxel_grid, extracted_voxels, grid_min_corner, grid_max_corner);
-        _flood_fill(x, y+1, z, visited_voxels, voxel_grid, extracted_voxels, grid_min_corner, grid_max_corner);
-        _flood_fill(x, y, z-1, visited_voxels, voxel_grid, extracted_voxels, grid_min_corner, grid_max_corner);
-        //_flood_fill(x, y, z+1, visited_voxels, voxel_grid, extracted_voxels, grid_min_corner, grid_max_corner);
+        // Scan in all orthogonal directions
+        voxels_to_scan.emplace_back(x-1, y, z);
+        voxels_to_scan.emplace_back(x+1, y, z);
+        voxels_to_scan.emplace_back(x, y-1, z);
+        voxels_to_scan.emplace_back(x, y+1, z);
+        voxels_to_scan.emplace_back(x, y, z-1);
+        voxels_to_scan.emplace_back(x, y, z+1);
     }
 }
 

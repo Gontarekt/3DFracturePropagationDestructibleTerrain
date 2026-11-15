@@ -4,6 +4,7 @@
 #include "voxel_utility.h"
 #include <godot_cpp/classes/fast_noise_lite.hpp>
 #include <godot_cpp/classes/static_body3d.hpp>
+#include <stack>
 
 
 namespace godot {
@@ -70,6 +71,6 @@ private:
  std::vector<VoxelUtility::VoxelGrid> _flood_filled_connected_component_voxel_extraction();
  void _flood_fill(const int x, const int y, const int z, std::vector<bool>& visited_voxels,
      VoxelUtility::VoxelGrid& voxel_grid, std::vector<VoxelUtility::ExtractedVoxel>& extracted_voxels,
-     Vector3i& grid_min_corner, Vector3i& grid_max_corner);
+     Vector3i& grid_min_corner, Vector3i& grid_max_corner, std::vector<std::tuple<int,int,int>>& voxels_to_scan);
 };
 } // namespace godot

@@ -1,11 +1,9 @@
 ## CURRENT ISSUE / CURRENT PROGRESS
 
-- Flood Fill algorithm in Voxel Terrain currently causes Stack Overflow when scanning in all 6 directions with a terrain
-chunk size of 64. Need to look into a stack friendly approach.
+
 
 ## TODO
 
-- Fix stack overflow issue with terrain flood fill.
 - Ethics Submission, remember to mention that the honours project is computer based.
 
 - Setup fracture propagation function
@@ -36,8 +34,3 @@ But need to make sure it doesn't do it each time a voxel is removed in fracture 
 Then this can be used to check adjacent chunks, ignoring chunks that will be used as anchors since they are the main body of terrain.
 
 ## NOTES
-
-Flood Fill connected-component algorithm on Geeks for Geeks site for a 2D structure seems
-to scan in 4 directions and only recursively search in all 4 directions if it entered a element that
-is of the same group as the previously scanned element.
-The fill function also returns if the element already has the same value
