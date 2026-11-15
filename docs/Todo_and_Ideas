@@ -1,10 +1,21 @@
+## CURRENT ISSUE / CURRENT PROGRESS
+
+- Flood Fill algorithm in Voxel Terrain currently causes Stack Overflow when scanning in all 6 directions with a terrain
+chunk size of 64. Need to look into a stack friendly approach.
+
 ## TODO
 
-- Flood-Filled connected-component algorithm for extracting voxel grids from terrain
-- Replace VoxelObject cube generation with generation from array (Use Initialise function)
-- Raycast VoxelGrid step-through logic (Currently can only hit boundary voxels due to the simple convex collider).
-- VoxelObject generation from extracted voxel grids
+- Fix stack overflow issue with terrain flood fill.
 - Ethics Submission, remember to mention that the honours project is computer based.
+
+- Setup fracture propagation function
+    - Should run the core steps: fracture_initiation(), fracture_propagation(), _generate_bodies_from_disconnected_voxels()
+    then trigger mesh & collider generation.
+    - Raycast should trigger fracture_propagation() instead of removing_voxel().
+
+- Raycast VoxelGrid step-through logic (Currently can only hit boundary voxels due to the simple convex collider).
+- Fix issue with disconnected voxel fragments phasing through terrain
+
 - Setup chunks for VoxelTerrain:
 Chunks can be stored in an unordered_map based on position. Positions will simply be in increments of 1,
 e.g. (0,0,0) (1,0,0) (2,0,0). To get the actual world position the position vectors would then be multiplied
@@ -12,10 +23,9 @@ by the size of the chunks. E.g. for 64x64x64 chunks, the positions become (0,0,0
 - Move naive voxel culling meshing logic to VoxelNode class. Can make some interface functions for getting a voxel at a position.
 - Move connected-component logic to VoxelNode (Object & Terrain should both have this functionality)
 - extract_voxel_group() function handling for multiple chunks. The groups should also include voxels in adjacent chunks.
-- Setup fracture propagation function
-    - Should run the core steps: fracture_initiation(), fracture_propagation(), _generate_bodies_from_disconnected_voxels()
-    then trigger mesh & collider generation.
-    - Raycast should trigger fracture_propagation() instead of removing_voxel().
+- Possibly make a more efficient vector3i than godot's implementation. My voxels only need a byte for each axis, 0 to 256 max. Chunks should
+probably never reach a size of 256 or greater, 128 is even a bit too much.
+
 
 ## IDEAS
 

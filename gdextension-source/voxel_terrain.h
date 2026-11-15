@@ -1,6 +1,7 @@
 #pragma once
 #include "sparse_voxel_octree.h"
 #include "voxel_node.h"
+#include "voxel_utility.h"
 #include <godot_cpp/classes/fast_noise_lite.hpp>
 #include <godot_cpp/classes/static_body3d.hpp>
 
@@ -10,6 +11,7 @@ class VoxelTerrain : public StaticBody3D, public VoxelNode {
   GDCLASS(VoxelTerrain, StaticBody3D)
 
 public:
+    // Minimum size will be 8 (TODO: Should enforce this)
     static constexpr int terrain_chunk_size = 64;
     SparseVoxelOctree sparse_voxel_octree;
 
@@ -59,11 +61,15 @@ private:
   // terrain
   void _generate_bodies_from_disconnected_voxels();
 
-  // Returns a vector of voxel grids that are disconnected from the main terrain
-  // body and removes them from the terrain chunk. Uses a connected-component
-  // algorithm. Also returns the position of the very first voxel (Lowest
-  // position in all axis) so the original position is saved. (Any voxels
-  // connected to unedited voxel chunks are part of the main body)
+  // Uses a Connected Component Labelling (CCL)
+  // algorithm to find and remove voxels, allocating them into different grids
+  // based on what group of voxels they are connected to.
+  // Returns the extracted grids.
  std::vector<VoxelUtility::VoxelGrid> _extract_disconnected_voxel_groups();
+ // Flood fill CCL implementation for extracting voxel grids
+ std::vector<VoxelUtility::VoxelGrid> _flood_filled_connected_component_voxel_extraction();
+ void _flood_fill(const int x, const int y, const int z, std::vector<bool>& visited_voxels,
+     VoxelUtility::VoxelGrid& voxel_grid, std::vector<VoxelUtility::ExtractedVoxel>& extracted_voxels,
+     Vector3i& grid_min_corner, Vector3i& grid_max_corner);
 };
 } // namespace godot

@@ -3,6 +3,7 @@
 #include "godot_cpp/classes/global_constants.hpp"
 #include <libmorton/morton.h>
 #include <bitset>
+#include "godot_cpp/variant/utility_functions.hpp"
 #include "voxel_object.h"
 #include "voxel_utility.h"
 
@@ -491,33 +492,133 @@ void VoxelTerrain::_generate_collider()
 
 std::vector<VoxelUtility::VoxelGrid> VoxelTerrain::_extract_disconnected_voxel_groups()
 {
+    return _flood_filled_connected_component_voxel_extraction();
+}
+
+
+std::vector<VoxelUtility::VoxelGrid> VoxelTerrain::_flood_filled_connected_component_voxel_extraction()
+{
     /*
      * Flood-Filled Connected Component Algorithm is used, with 6 connectivity (Equivalent to 4 connectivity in 2D).
+     * Chosen for its simplicity.
      * Only immediately adjacent voxels are checked instead of voxels on the diagonals.
      * The entire chunk will be scanned.
+     */
+    /* IDEA:
+     * Stored a 1D boolean array of size terrain_chunk_size^3 to represent whether a voxel has been visited by the flood fill algorithm.
+     * Main loop that scans over every voxel in the grid and checks if it isn't empty (!= 0) and hasn't been visited yet.
+     * If both conditions are true then a new extracted grid is created and a flood fill recursive function is called on
+     * that voxel.
      *
-     * Compared to normal uses of flood-fill, this implementation only needs to concern itself with the voxel
-     * either being a value of 0 or any other value. If it isn't 0 then a new grid can be created from the group
-     * of which could be a mix of values, e.g. 1, 2, 3, and so on.
+     * Flood fill function will first do a boundary check to check voxel isn't outside of the grid.
+     * Then the voxel will be evaluated for whether it is not empty and hasn't been visited yet.
+     * If both conditions are true, then it will be marked as visited, placed into the newly created grid
+     * and finally removed from the terrain chunk.
+     * Then the function will scan in the 6 orthogonal directions, calling the flood fill function at each adjacent voxel.
+     *
+     * Each voxel that is extracted will explicitly store its position until the full bounds of their respective grids
+     * has been obtained / flood fill is complete. You can't place them into the actual grid until then as you need the
+     * grid bounds to index the voxel grid vector.
+     */
+    /*
+     * NOTE ISSUE: Current implementation is crashing due to flood fill recursion, possible stack overflow.
+     * It is fine with 5/6 calls, but a 6th call causes a crash.
+     * Additionally, if I have all 6 calls active but change the terrain chunk size to 32 instead of 64, then it is also fine.
      */
 
     std::vector<VoxelUtility::VoxelGrid> extracted_voxel_grids;
+    // Store voxels with their position and voxel value in a separate vector as the full grid size
+    // isn't known until the flood fill is complete
+    std::vector<std::vector<VoxelUtility::ExtractedVoxel>> extracted_voxels;
+    std::vector<bool> visited_voxels(terrain_chunk_size*terrain_chunk_size*terrain_chunk_size, false);
 
-    /*
-     * Current Idea:
-     * I have 2 steps,
-     * - Single Vector with object ID to voxel position
-     * - Create Voxel Grids from the Object ID Vector
-     *
-     * I first have a single vector which I then push a voxel position to with an id.
-     * Whenever I scan an adjacent voxel, if it is not an empty voxel (!= 0) and the previous voxel was not empty, then
-     * it gets added to the vector with the same ID as that previous voxel. Otherwise I will give it a new ID which is an increment
-     * of a simple int 'ID' variable outside of the scan loop.
-     * If I find that there is an adjacent voxel that has been assigned an ID already and isn't empty, then all voxels with the greatest value ID
-     * will be changed to the ID of the lowest ID.
-     */
+    UtilityFunctions::print("\nFlood fill connected component start");
+
+    for (int x = 0; x < terrain_chunk_size; x++)
+    {
+        for (int y = 0; y < terrain_chunk_size; y++)
+        {
+            for (int z = 0; z < terrain_chunk_size; z++)
+            {
+                // If voxel is not empty and hasn't been visited yet, then this is a new grid that can be scanned recursively
+                int voxel_index = VoxelUtility::voxel_index_from_position(terrain_chunk_size, terrain_chunk_size, Vector3(x,y,z));
+                if (sparse_voxel_octree.get_voxel(x, y, z) != 0 &&
+                    visited_voxels[voxel_index] == false)
+                {
+                    // Create a new voxel grid and recursively scan from the voxel until the entire group has been found.
+                    // Need highest and lowest position voxel so that grid can be correctly sized and to obtain the grid offset.
+
+                    Vector3i grid_min_corner = Vector3i(x,y,z);
+                    Vector3i grid_max_corner = Vector3i(x,y,z);
+                    extracted_voxel_grids.emplace_back();
+                    extracted_voxels.emplace_back();
+                    _flood_fill(x, y, z, visited_voxels, extracted_voxel_grids.back(),
+                        extracted_voxels.back(), grid_min_corner, grid_max_corner);
+
+                    extracted_voxel_grids.back().offset_in_parent_grid = grid_min_corner;
+                    extracted_voxel_grids.back().dimensions = grid_max_corner - grid_min_corner + Vector3i(1, 1, 1);
+                }
+            }
+        }
+    }
+
+    // Construct the voxel grids from the extracted voxels
+
+    for (int i = 0; i < extracted_voxel_grids.size(); i++)
+    {
+        const int width = extracted_voxel_grids[i].dimensions.x;
+        const int height = extracted_voxel_grids[i].dimensions.y;
+        const int depth = extracted_voxel_grids[i].dimensions.z;
+        const int voxel_vector_size = width * height * depth;
+        extracted_voxel_grids[i].voxels.resize(voxel_vector_size);
+        for (auto& extracted_voxel : extracted_voxels[i])
+        {
+            const Vector3i new_voxel_position = extracted_voxel.position - extracted_voxel_grids[i].offset_in_parent_grid;
+            const int voxel_index = VoxelUtility::voxel_index_from_position(width, height, new_voxel_position);
+            extracted_voxel_grids[i].voxels[voxel_index] = extracted_voxel.voxel;
+        }
+    }
 
     return extracted_voxel_grids;
+}
+
+
+void VoxelTerrain::_flood_fill(const int x, const int y, const int z, std::vector<bool>& visited_voxels,
+    VoxelUtility::VoxelGrid& voxel_grid, std::vector<VoxelUtility::ExtractedVoxel>& extracted_voxels,
+    Vector3i& grid_min_corner, Vector3i& grid_max_corner)
+{
+    // Boundary check, voxel must be within the parent grid.
+    if (x < 0 || y < 0 || z < 0 || x >= terrain_chunk_size || y >= terrain_chunk_size || z >= terrain_chunk_size) { return; }
+
+    int voxel_index = VoxelUtility::voxel_index_from_position(terrain_chunk_size, terrain_chunk_size, Vector3(x,y,z));
+    VoxelUtility::Voxel voxel_value = sparse_voxel_octree.get_voxel(x, y, z);
+    // Check if voxel exists and is connected to the grid
+    if (voxel_value != 0 &&
+        visited_voxels[voxel_index] == false)
+    {
+        // Flag voxel as visited
+        visited_voxels[voxel_index] = true;
+
+        // Extract voxel
+        extracted_voxels.push_back(VoxelUtility::ExtractedVoxel{godot::Vector3i(x,y,z), voxel_value});
+        remove_voxel(Vector3(x,y,z));
+
+        // Update extracted grids min and max bounds.
+        grid_max_corner.x = std::max(x, grid_max_corner.x);
+        grid_max_corner.y = std::max(y, grid_max_corner.y);
+        grid_max_corner.z = std::max(z, grid_max_corner.z);
+        grid_min_corner.x = std::min(x, grid_min_corner.x);
+        grid_min_corner.y = std::min(y, grid_min_corner.y);
+        grid_min_corner.z = std::min(z, grid_min_corner.z);
+
+        // Recursively scan in all orthogonal directions
+        _flood_fill(x-1, y, z, visited_voxels, voxel_grid, extracted_voxels, grid_min_corner, grid_max_corner);
+        _flood_fill(x+1, y, z, visited_voxels, voxel_grid, extracted_voxels, grid_min_corner, grid_max_corner);
+        _flood_fill(x, y-1, z, visited_voxels, voxel_grid, extracted_voxels, grid_min_corner, grid_max_corner);
+        _flood_fill(x, y+1, z, visited_voxels, voxel_grid, extracted_voxels, grid_min_corner, grid_max_corner);
+        _flood_fill(x, y, z-1, visited_voxels, voxel_grid, extracted_voxels, grid_min_corner, grid_max_corner);
+        //_flood_fill(x, y, z+1, visited_voxels, voxel_grid, extracted_voxels, grid_min_corner, grid_max_corner);
+    }
 }
 
 
@@ -533,11 +634,11 @@ void VoxelTerrain::_generate_bodies_from_disconnected_voxels()
     for (const auto& [voxel_vector, dimensions, grid_offset] : disconnected_voxel_grids)
     {
         VoxelObject* new_voxel_object = memnew(VoxelObject);
-        //new_voxel_object->initialise(dimensions, voxel_vector); // TODO
-        // Make sure to apply scale before setting the global position or they will not match at scales other than 1!
-        //new_voxel_object->set_scale(get_scale());
-        //new_voxel_object->set_global_position(get_global_position() + (get_scale() * grid_offset));
+        new_voxel_object->initialise(dimensions, voxel_vector);
         get_parent()->add_child(new_voxel_object);
+        // Make sure to apply scale before setting the global position or they will not match at scales other than 1!
+        new_voxel_object->set_scale(get_scale());
+        new_voxel_object->set_global_position(get_global_position() + (get_scale() * grid_offset));
     }
 
     /*TEST*/
