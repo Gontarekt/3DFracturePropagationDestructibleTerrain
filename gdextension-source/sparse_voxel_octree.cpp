@@ -1,4 +1,5 @@
 #include "sparse_voxel_octree.h"
+#include "voxel_utility.h"
 
 
 //////////////////////
@@ -95,7 +96,7 @@ VoxelUtility::Voxel SparseVoxelOctree::_find_node_value(int64_t octree_index)
 
         // NOTE: Since we know what type a node is going to be at any given point,
         // use static_cast to avoid the overhead of dynamic cast!
-        if (i == MORTON_CODE_OFFSET_AT_MAXIMUM_DEPTH)
+        if (current_node->is_leaf)
         {
             // If at the end of the morton code, then you can gaurantee it is a leaf node.
             Leaf* leaf = static_cast<Leaf*>(current_node);
@@ -136,6 +137,7 @@ VoxelUtility::Voxel& SparseVoxelOctree::_find_or_create_node(int64_t octree_inde
      * The loop reads 3 bits at a time which represent the x,y,z of the node using only 1 bit.
      */
     Node* current_node = root.get();
+    Branch* parent_node = nullptr;
     for (int i = 3 * (_max_depth-1); i >= MORTON_CODE_OFFSET_AT_MAXIMUM_DEPTH; i-=3)
     {
         // This is simply a 0-7 value to get the index of the child at the current node
@@ -143,11 +145,21 @@ VoxelUtility::Voxel& SparseVoxelOctree::_find_or_create_node(int64_t octree_inde
 
         // NOTE: Since we know what type a node is going to be at any given point,
         // use static_cast to avoid the overhead of dynamic cast!
-        if (i == MORTON_CODE_OFFSET_AT_MAXIMUM_DEPTH)
+        if (current_node->is_leaf)
         {
-            // If at the end of the morton code, then you can gaurantee it is a leaf node.
             Leaf* leaf = static_cast<Leaf*>(current_node);
-            return leaf->data[node_index];
+            // If at the maximum depth, the octree cannot be subdivided further.
+            //if (i == MORTON_CODE_OFFSET_AT_MAXIMUM_DEPTH)
+            //{
+                // If at the end of the morton code, then no further subdivisions
+                return leaf->data[node_index];
+                //}
+            // else
+            // {
+            //     // Subdivide the node, turn it into a branch with leaf nodes as children
+            //     std::array<VoxelUtility::Voxel,8> previous_data = leaf->data;
+
+            // }
         }
         else {
             // Since we haven't fully read the Morton code yet, we should create new nodes
@@ -168,6 +180,7 @@ VoxelUtility::Voxel& SparseVoxelOctree::_find_or_create_node(int64_t octree_inde
                 std::unique_ptr<Node> new_child = i == MORTON_CODE_OFFSET_AT_MAXIMUM_DEPTH+3
                     ? static_cast<std::unique_ptr<Node>>(std::make_unique<Leaf>())
                     : static_cast<std::unique_ptr<Node>>(std::make_unique<Branch>());
+                parent_node = branch;
                 current_node = new_child.get();
                 branch->children[node_index] = std::move(new_child);
             }

@@ -51,6 +51,7 @@ void VoxelCube::_ready()
     UtilityFunctions::print("\nVoxelCube grid generation took ", elapsed_time, " ms");
     UtilityFunctions::print("VoxelCube NumBytes: ", sizeof(VoxelUtility::VoxelVector) + (sizeof(VoxelUtility::Voxel) * _voxels->capacity()));
 
+    _voxel_grid_initialised = true;
     if (_voxels) {
         UtilityFunctions::print("Voxel array size: ", _voxels->size());
     }
@@ -483,8 +484,8 @@ void VoxelCube::_generate_collider()
     std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
 
     // Note This seems to create a static body child, I need it only create a collider and under the same parent
-    //mesh_node->create_convex_collision();
-    _mesh_node->create_trimesh_collision();
+    _mesh_node->create_convex_collision();
+    //_mesh_node->create_trimesh_collision();
 
     // Temp fix
     if (_collider_node) {

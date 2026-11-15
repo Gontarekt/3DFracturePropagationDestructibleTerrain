@@ -20,7 +20,6 @@
         static_cast<bool (class_name::*)() const>(&class_name::get_mesh_needs_generated)); \
 	godot::ClassDB::bind_method(godot::D_METHOD("set_mesh_needs_generated", "new_mesh_needs_generated"), \
 	    static_cast<void (class_name::*)(const bool)>(&class_name::set_mesh_needs_generated)); \
-	ADD_PROPERTY(godot::PropertyInfo(godot::Variant::BOOL, "mesh_needs_generated"), "set_mesh_needs_generated", "get_mesh_needs_generated"); \
     \
     godot::ClassDB::bind_method(godot::D_METHOD("get_num_mesh_generation_tests_to_run"), \
 	    static_cast<int (class_name::*)() const>(&class_name::get_num_mesh_generation_tests_to_run)); \
@@ -65,6 +64,7 @@ class VoxelNode {
         godot::MeshInstance3D* _mesh_node = nullptr;
         godot::CollisionShape3D* _collider_node = nullptr;
 
+        bool _voxel_grid_initialised = false; // Set this to true once you've created the voxel grid
         bool _mesh_needs_generated = true;
         bool _collider_needs_generated = true;
         int _num_mesh_generation_tests_to_run = 1;

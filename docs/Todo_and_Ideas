@@ -1,11 +1,29 @@
 ## TODO
 
-- Create VoxelObject class for generic Voxel Vector stored grids, it should inherit Godot's RigidBody node
+- Flood-Filled connected-component algorithm for extracting voxel grids from terrain
+- Replace VoxelObject cube generation with generation from array (Use Initialise function)
+- Raycast VoxelGrid step-through logic (Currently can only hit boundary voxels due to the simple convex collider).
+- VoxelObject generation from extracted voxel grids
+- Ethics Submission, remember to mention that the honours project is computer based.
 - Setup chunks for VoxelTerrain:
-Chunks can be stored in an unordered_map based on position. Positions will simply be in increments of 1, 
+Chunks can be stored in an unordered_map based on position. Positions will simply be in increments of 1,
 e.g. (0,0,0) (1,0,0) (2,0,0). To get the actual world position the position vectors would then be multiplied
 by the size of the chunks. E.g. for 64x64x64 chunks, the positions become (0,0,0) (64,0,0) (128,0,0).
-- Flood-Filled connected-component algorithm for extracting voxel grids from terrain
-- VoxelObject generation from extracted voxel grids
+- Move naive voxel culling meshing logic to VoxelNode class. Can make some interface functions for getting a voxel at a position.
+- Move connected-component logic to VoxelNode (Object & Terrain should both have this functionality)
+- extract_voxel_group() function handling for multiple chunks. The groups should also include voxels in adjacent chunks.
 
 ## IDEAS
+
+Voxel Disconnected Component Algorithm:
+- Perhaps the algorithm should start from and only check voxels adjacent to it when using the normal remove voxel function?
+But need to make sure it doesn't do it each time a voxel is removed in fracture propagation which will use the same function.
+- Can have a boolean on a terrain chunk for whether it has been modified since generation (set to true after remove_voxel() call or even when a voxel is added)
+Then this can be used to check adjacent chunks, ignoring chunks that will be used as anchors since they are the main body of terrain.
+
+## NOTES
+
+Flood Fill connected-component algorithm on Geeks for Geeks site for a 2D structure seems
+to scan in 4 directions and only recursively search in all 4 directions if it entered a element that
+is of the same group as the previously scanned element.
+The fill function also returns if the element already has the same value

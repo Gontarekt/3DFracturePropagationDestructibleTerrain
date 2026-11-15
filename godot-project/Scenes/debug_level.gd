@@ -52,7 +52,10 @@ func _process(_delta: float) -> void:
 			collision_point_in_local_space -= _ray.get_collision_normal() * 0.1
 			var voxel_position: Vector3 = collision_point_in_local_space.round()
 			print ("Voxel Position: ", "%0.3v" % voxel_position);
-			if collided_object is VoxelCube:
+			if collided_object is VoxelObject:
+				var collided_voxel_object = collided_object as VoxelObject
+				collided_voxel_object.remove_voxel(voxel_position)
+			elif collided_object is VoxelCube:
 				#print ("VoxelCube detected")
 				var collided_voxel_cube = collided_object as VoxelCube
 				collided_voxel_cube.remove_voxel(voxel_position)
@@ -92,10 +95,12 @@ func _draw_imgui() -> void:
 	ImGui.Text("Voxel Terrain")
 	if(ImGui.Button("Generate Solid Cube")):
 		voxel_terrain.create_solid_cube_SVO();
-		voxel_terrain.mesh_needs_generated = true
+		voxel_terrain.set_mesh_needs_generated(true)
 	if(ImGui.Button("Generate Noise Voxels")):
 		voxel_terrain.create_noise_terrain_SVO();
-		voxel_terrain.mesh_needs_generated = true
+		voxel_terrain.set_mesh_needs_generated(true)
+	if(ImGui.Button("Disconnected Voxels Scan")):
+		voxel_terrain.set_check_disconnected_components(true)
 	var data_array: Array = [voxel_terrain.noise_voxel_spawn_threshold]
 	if(ImGui.SliderFloat("Voxel Noise Threshold", data_array, -1.0, 1.0)):
 		voxel_terrain.noise_voxel_spawn_threshold = data_array[0]

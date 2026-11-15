@@ -7,6 +7,12 @@
 ambient_light_color = Color(1, 1, 1, 1)
 ambient_light_energy = 2.85
 
+[sub_resource type="BoxMesh" id="BoxMesh_bo1nx"]
+size = Vector3(100, 1, 100)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_8gbba"]
+points = PackedVector3Array(-50, -0.5, -50, -50, 0.5, -50, 50, -0.5, -50, -50, -0.5, 50, -50, 0.5, 50, 50, 0.5, -50, 50, -0.5, 50, 50, 0.5, 50)
+
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bo1nx"]
 albedo_color = Color(1, 0, 1, 1)
 
@@ -32,8 +38,17 @@ environment = SubResource("Environment_7dm0k")
 transform = Transform3D(1, 0, 0, 0, 0.9416293, 0.33665156, 0, -0.33665156, 0.9416293, 0, 1.714189, 1.998418)
 script = ExtResource("1_jjgbg")
 
+[node name="Floor" type="StaticBody3D" parent="." unique_id=1284816428]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor" unique_id=1942622387]
+mesh = SubResource("BoxMesh_bo1nx")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor" unique_id=1588373319]
+shape = SubResource("ConvexPolygonShape3D_8gbba")
+
 [node name="ReferenceObject" type="StaticBody3D" parent="." unique_id=39155869]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.266645, 0.17655325, -3.9253254)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0013208389, 0, -7.452941)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="ReferenceObject" unique_id=630849522]
 mesh = SubResource("BoxMesh_7dm0k")
@@ -48,3 +63,13 @@ transform = Transform3D(0.05, 0, 0, 0, 0.05, 0, 0, 0, 0.05, -0.0013208389, 0, -7
 [node name="VoxelTerrain" type="VoxelTerrain" parent="." unique_id=1506125266]
 noise_voxel_spawn_threshold = 0.1
 transform = Transform3D(0.05, 0, 0, 0, 0.05, 0, 0, 0, 0.05, -9.413542, 0, -9.716253)
+
+[node name="VoxelObject" type="VoxelObject" parent="." unique_id=96855864]
+size = Vector3i(16, 16, 16)
+should_generate_solid_cube = true
+transform = Transform3D(0.05, 0, 0, 0, 0.05, 0, 0, 0, 0.05, 0, 2.0418472, -25.41376)
+
+[node name="VoxelObject2" type="VoxelObject" parent="." unique_id=1981395435]
+size = Vector3i(16, 16, 16)
+should_generate_solid_cube = true
+transform = Transform3D(0.05, 0, 0, 0, 0.05, 0, 0, 0, 0.05, 0, 7.665889, -25.41376)

@@ -3,6 +3,7 @@
 #include "gdexample.h"
 #include "voxel_cube.h"
 #include "voxel_terrain.h"
+#include "voxel_object.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/defs.hpp>
@@ -18,6 +19,7 @@ void initialize_example_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_RUNTIME_CLASS(GDExample);
 	GDREGISTER_RUNTIME_CLASS(VoxelCube);
 	GDREGISTER_RUNTIME_CLASS(VoxelTerrain);
+	GDREGISTER_RUNTIME_CLASS(VoxelObject);
 }
 
 void uninitialize_example_module(ModuleInitializationLevel p_level) {

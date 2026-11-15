@@ -9,6 +9,13 @@ namespace VoxelUtility
 {
     using Voxel = std::uint8_t;
     using VoxelVector = std::vector<std::uint8_t>;
+    struct VoxelGrid
+    {
+        VoxelVector voxels;
+        godot::Vector3i dimensions;
+        // If created from another grid then this is the position offset relative to the original grid
+        godot::Vector3 offset_in_parent_grid = godot::Vector3(0.f,0.f,0.f);
+    };
 
     inline const godot::Vector3i UP = { 0, 1, 0 };
     inline const godot::Vector3i DOWN = { 0, -1, 0 };

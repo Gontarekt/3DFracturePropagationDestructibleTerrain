@@ -1,5 +1,6 @@
 #include "voxel_node.h"
 #include "godot_cpp/classes/array_mesh.hpp"
+#include "godot_cpp/core/print_string.hpp"
 
 
 VoxelNode::VoxelNode()
@@ -46,6 +47,13 @@ void VoxelNode::_initialise_nodes(godot::Node* this_node)
 
 void VoxelNode::_process_geometry_updates()
 {
+    if (!_voxel_grid_initialised)
+    {
+        //CRASH_NOW_MSG("VoxelNode was not initialised! Did you forget to set the initialised bool to true or did you forget to create a grid for the node?");
+        godot::print_error("VoxelNode was not initialised! Did you forget to set the initialised bool to true or did you forget to create a grid for the node?");
+        return;
+    }
+
     if (_mesh_needs_generated)
     {
         _generate_mesh();

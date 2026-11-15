@@ -3,6 +3,8 @@
 #include "godot_cpp/classes/global_constants.hpp"
 #include <libmorton/morton.h>
 #include <bitset>
+#include "voxel_object.h"
+#include "voxel_utility.h"
 
 
 using namespace godot;
@@ -14,6 +16,9 @@ void VoxelTerrain::_bind_methods()
 
 	ClassDB::bind_method(D_METHOD("create_noise_terrain_SVO"), &VoxelTerrain::create_noise_terrain_SVO);
 	ClassDB::bind_method(D_METHOD("create_solid_cube_SVO"), &VoxelTerrain::create_solid_cube_SVO);
+
+	ClassDB::bind_method(D_METHOD("get_check_disconnected_components"), &VoxelTerrain::get_check_disconnected_components);
+	ClassDB::bind_method(D_METHOD("set_check_disconnected_components", "new_check_disconnected_components"), &VoxelTerrain::set_check_disconnected_components);
 
 	ClassDB::bind_method(D_METHOD("get_noise_frequency"), &VoxelTerrain::get_noise_frequency);
 	ClassDB::bind_method(D_METHOD("set_noise_frequency", "new_noise_frequency"), &VoxelTerrain::set_noise_frequency);
@@ -68,7 +73,7 @@ void VoxelTerrain::_process(double delta)
 
 void VoxelTerrain::remove_voxel(Vector3 voxel_position)
 {
-    UtilityFunctions::print("VoxelTerrain remove_voxel()");
+    //UtilityFunctions::print("VoxelTerrain remove_voxel()");
     sparse_voxel_octree.insert_voxel(voxel_position.x, voxel_position.y, voxel_position.z, 0);
     _mesh_needs_generated = true;
 }
@@ -95,6 +100,8 @@ void VoxelTerrain::create_solid_cube_SVO()
     double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
     UtilityFunctions::print("Terrain Solid Cube generation took: ", elapsed_time, " ms");
     UtilityFunctions::print("Terrain NumBytes: ", sparse_voxel_octree.get_total_bytes_in_memory());
+
+    _voxel_grid_initialised = true;
 }
 
 
@@ -128,18 +135,8 @@ void VoxelTerrain::create_noise_terrain_SVO()
     double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
     UtilityFunctions::print("\nTerrain Noise generation took: ", elapsed_time, " ms");
     UtilityFunctions::print("Terrain NumBytes: ", sparse_voxel_octree.get_total_bytes_in_memory());
-}
 
-
-void VoxelTerrain::generate_bodies_from_disconnected_voxels()
-{
-    // Find and remove the disconnected voxels from the terrain's voxel grid
-    std::vector<std::pair<VoxelUtility::VoxelVector, godot::Vector3i>> disconnected_voxel_grids = _extract_disconnected_voxel_groups();
-
-    // Create a new RigidBody Voxel Grid in the scene for each disconnected voxel grid.
-    // Need to position it relative to the terrain chunk where the voxel grid originated from.
-
-    /// TODO
+    _voxel_grid_initialised = true;
 }
 
 
@@ -213,6 +210,17 @@ void VoxelTerrain::_morton_code_test()
     UtilityFunctions::print("Morton Code 9: ", std::bitset<64>(index9).to_string().c_str(), " int: ", index9);
     UtilityFunctions::print("Morton Code 10: ", std::bitset<64>(index10).to_string().c_str(), " int: ", index10);
     UtilityFunctions::print("Morton Code 11: ", std::bitset<64>(index11).to_string().c_str(), " int: ", index11);
+}
+
+
+void VoxelTerrain::_process_geometry_updates()
+{
+    VoxelNode::_process_geometry_updates();
+    if (_check_disconnected_components)
+    {
+        _generate_bodies_from_disconnected_voxels();
+        _check_disconnected_components = false;
+    }
 }
 
 
@@ -464,8 +472,8 @@ void VoxelTerrain::_generate_collider()
     std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
 
     // Note This seems to create a static body child, I need it only create a collider and under the same parent
-    //mesh_node->create_convex_collision();
-    _mesh_node->create_trimesh_collision();
+    _mesh_node->create_convex_collision();
+    //_mesh_node->create_trimesh_collision();
 
     // Temp fix
     if (_collider_node) {
@@ -482,7 +490,87 @@ void VoxelTerrain::_generate_collider()
 }
 
 
-std::vector<std::pair<VoxelUtility::VoxelVector, godot::Vector3i>> VoxelTerrain::_extract_disconnected_voxel_groups()
+std::vector<VoxelUtility::VoxelGrid> VoxelTerrain::_extract_disconnected_voxel_groups()
 {
-    return {}; /// TODO
+    /*
+     * Flood-Filled Connected Component Algorithm is used, with 6 connectivity (Equivalent to 4 connectivity in 2D).
+     * Only immediately adjacent voxels are checked instead of voxels on the diagonals.
+     * The entire chunk will be scanned.
+     *
+     * Compared to normal uses of flood-fill, this implementation only needs to concern itself with the voxel
+     * either being a value of 0 or any other value. If it isn't 0 then a new grid can be created from the group
+     * of which could be a mix of values, e.g. 1, 2, 3, and so on.
+     */
+
+    std::vector<VoxelUtility::VoxelGrid> extracted_voxel_grids;
+
+    /*
+     * Current Idea:
+     * I have 2 steps,
+     * - Single Vector with object ID to voxel position
+     * - Create Voxel Grids from the Object ID Vector
+     *
+     * I first have a single vector which I then push a voxel position to with an id.
+     * Whenever I scan an adjacent voxel, if it is not an empty voxel (!= 0) and the previous voxel was not empty, then
+     * it gets added to the vector with the same ID as that previous voxel. Otherwise I will give it a new ID which is an increment
+     * of a simple int 'ID' variable outside of the scan loop.
+     * If I find that there is an adjacent voxel that has been assigned an ID already and isn't empty, then all voxels with the greatest value ID
+     * will be changed to the ID of the lowest ID.
+     */
+
+    return extracted_voxel_grids;
+}
+
+
+void VoxelTerrain::_generate_bodies_from_disconnected_voxels()
+{
+    std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
+
+    // Find and remove the disconnected voxels from the terrain's voxel grid
+    std::vector<VoxelUtility::VoxelGrid> disconnected_voxel_grids = _extract_disconnected_voxel_groups();
+
+    // Create a new RigidBody Voxel Grid in the scene for each disconnected voxel grid.
+    // Position it relative to the terrain chunk where the voxel grid originated from.
+    for (const auto& [voxel_vector, dimensions, grid_offset] : disconnected_voxel_grids)
+    {
+        VoxelObject* new_voxel_object = memnew(VoxelObject);
+        //new_voxel_object->initialise(dimensions, voxel_vector); // TODO
+        // Make sure to apply scale before setting the global position or they will not match at scales other than 1!
+        //new_voxel_object->set_scale(get_scale());
+        //new_voxel_object->set_global_position(get_global_position() + (get_scale() * grid_offset));
+        get_parent()->add_child(new_voxel_object);
+    }
+
+    /*TEST*/
+    VoxelUtility::VoxelGrid voxel_grid;
+    voxel_grid.offset_in_parent_grid = Vector3i(0,5,0);
+    bool is_grid_empty = true;
+    for (int i = 0; i < 32; i++)
+    {
+        Vector3 voxel_position = Vector3(i,0,0) +  voxel_grid.offset_in_parent_grid;
+        VoxelUtility::Voxel voxel = sparse_voxel_octree.get_voxel(voxel_position.x, voxel_position.y, voxel_position.z);
+        voxel_grid.voxels.push_back(voxel);
+        if (voxel != 0) { is_grid_empty = false; }
+        remove_voxel(voxel_position);
+    }
+    if (!is_grid_empty)
+    {
+        voxel_grid.dimensions = Vector3i(32,1,1);
+        VoxelObject* new_voxel_object = memnew(VoxelObject);
+        new_voxel_object->initialise(voxel_grid.dimensions, voxel_grid.voxels);
+        get_parent()->add_child(new_voxel_object);
+        new_voxel_object->set_scale(get_scale());
+        // Local position also works since I use the same parent.
+        // NOTE: position should be offset by the lowest position voxel in the grid so
+        // that it spawns in the correct position relative to the original grid (the terrain).
+        new_voxel_object->set_global_position(get_global_position() + ( voxel_grid.offset_in_parent_grid * get_scale()));
+        //new_voxel_object->set_freeze_enabled(true);
+    }
+    /*TEST END*/
+
+    std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
+    double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+    UtilityFunctions::print("\nVoxelTerrain connected-component scan and body generation took ", elapsed_time, " ms");
+
+    _mesh_needs_generated = true;
 }
