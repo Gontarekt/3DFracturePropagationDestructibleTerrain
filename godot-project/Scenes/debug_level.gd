@@ -55,14 +55,17 @@ func _process(_delta: float) -> void:
 			if collided_object is VoxelObject:
 				var collided_voxel_object = collided_object as VoxelObject
 				collided_voxel_object.remove_voxel(voxel_position)
+				collided_voxel_object.set_mesh_needs_generated(true);
 			elif collided_object is VoxelCube:
 				#print ("VoxelCube detected")
 				var collided_voxel_cube = collided_object as VoxelCube
 				collided_voxel_cube.remove_voxel(voxel_position)
+				collided_voxel_cube.set_mesh_needs_generated(true);
 			elif collided_object is VoxelTerrain:
 				#print ("VoxelTerrain detected")
 				var collided_voxel_terrain = collided_object as VoxelTerrain
 				collided_voxel_terrain.remove_voxel(voxel_position)
+				collided_voxel_terrain.set_mesh_needs_generated(true);
 
 	# Create raycast
 	if !_left_mouse_held and Input.is_action_pressed("CreateRaycastAtMouse"):

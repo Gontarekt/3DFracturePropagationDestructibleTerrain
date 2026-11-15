@@ -12,6 +12,10 @@ by the size of the chunks. E.g. for 64x64x64 chunks, the positions become (0,0,0
 - Move naive voxel culling meshing logic to VoxelNode class. Can make some interface functions for getting a voxel at a position.
 - Move connected-component logic to VoxelNode (Object & Terrain should both have this functionality)
 - extract_voxel_group() function handling for multiple chunks. The groups should also include voxels in adjacent chunks.
+- Setup fracture propagation function
+    - Should run the core steps: fracture_initiation(), fracture_propagation(), _generate_bodies_from_disconnected_voxels()
+    then trigger mesh & collider generation.
+    - Raycast should trigger fracture_propagation() instead of removing_voxel().
 
 ## IDEAS
 

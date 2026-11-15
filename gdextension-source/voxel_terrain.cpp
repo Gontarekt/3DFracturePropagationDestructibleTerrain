@@ -75,7 +75,6 @@ void VoxelTerrain::remove_voxel(Vector3 voxel_position)
 {
     //UtilityFunctions::print("VoxelTerrain remove_voxel()");
     sparse_voxel_octree.insert_voxel(voxel_position.x, voxel_position.y, voxel_position.z, 0);
-    _mesh_needs_generated = true;
 }
 
 

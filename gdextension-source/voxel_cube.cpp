@@ -73,7 +73,6 @@ void VoxelCube::remove_voxel(Vector3 voxel_position)
     UtilityFunctions::print("VoxelCube remove_voxel()");
     int voxel_index = VoxelUtility::voxel_index_from_position(_size.x, _size.y, voxel_position);
     _voxels->at(voxel_index) = 0;
-    _mesh_needs_generated = true;
 }
 
 
