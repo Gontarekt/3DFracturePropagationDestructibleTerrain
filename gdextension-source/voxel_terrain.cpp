@@ -7,6 +7,7 @@
 #include "voxel_object.h"
 #include "voxel_utility.h"
 #include "godot_cpp/classes/shape3d.hpp"
+#include "godot_cpp/classes/standard_material3d.hpp"
 
 
 using namespace godot;
@@ -21,6 +22,9 @@ void VoxelTerrain::_bind_methods()
 
 	ClassDB::bind_method(D_METHOD("get_check_disconnected_components"), &VoxelTerrain::get_check_disconnected_components);
 	ClassDB::bind_method(D_METHOD("set_check_disconnected_components", "new_check_disconnected_components"), &VoxelTerrain::set_check_disconnected_components);
+
+	ClassDB::bind_method(D_METHOD("get_draw_toughness_debug_mesh"), &VoxelTerrain::get_draw_toughness_debug_mesh);
+	ClassDB::bind_method(D_METHOD("set_draw_toughness_debug_mesh", "new_draw_toughness_debug_mesh"), &VoxelTerrain::set_draw_toughness_debug_mesh);
 
 	ClassDB::bind_method(D_METHOD("get_noise_frequency"), &VoxelTerrain::get_noise_frequency);
 	ClassDB::bind_method(D_METHOD("set_noise_frequency", "new_noise_frequency"), &VoxelTerrain::set_noise_frequency);
@@ -61,6 +65,16 @@ VoxelTerrain::~VoxelTerrain() {
 void VoxelTerrain::_ready()
 {
     _initialise_nodes(this);
+
+    terrain_noise_generator.instantiate();
+    terrain_noise_generator->set_noise_type(_noise_type);
+    terrain_noise_generator->set_frequency(_noise_frequency);
+
+    toughness_noise_generator.instantiate();
+    toughness_noise_generator->set_noise_type(FastNoiseLite::TYPE_SIMPLEX);
+    toughness_noise_generator->set_frequency(0.02);
+    toughness_noise_generator->set_seed(toughness_noise_generator->get_seed()+1.f);
+
     create_noise_terrain_SVO();
 }
 
@@ -122,21 +136,12 @@ void VoxelTerrain::initiate_fracture_propagation(Vector3 voxel_position, float i
 
 float VoxelTerrain::_get_voxel_toughness(Vector3i voxel_position)
 {
-    Ref<FastNoiseLite> noise_generator;
-    noise_generator.instantiate();
-    noise_generator->set_noise_type(FastNoiseLite::TYPE_SIMPLEX);
-    noise_generator->set_frequency(0.02);
-
     // Expected output of -1 to 1 that is spatially varied
-    float noise_value = noise_generator->get_noise_3d(voxel_position.x, voxel_position.y, voxel_position.z);
+    float noise_value = toughness_noise_generator->get_noise_3d(voxel_position.x, voxel_position.y, voxel_position.z);
     // Convert from (-1 to 1) to (0 to 1)
     noise_value += 1;
     noise_value /= 2;
 
-    // Based these toughness values roughly on the article: https://dl.acm.org/doi/epdf/10.1145/2766896
-    // Toughness: 1.0E+5 +50%
-    constexpr float MINIMUM_TOUGHNESS = 100000.f;
-    constexpr float MAXIMUM_TOUGHNESS = 150000.f;
     float toughness = 0.f;
     // Interpolate between a minimum and maximum toughness based on the noise value
     toughness = MINIMUM_TOUGHNESS + noise_value * (MAXIMUM_TOUGHNESS - MINIMUM_TOUGHNESS);
@@ -175,11 +180,6 @@ void VoxelTerrain::create_noise_terrain_SVO()
     // Clear Previous Voxels
     sparse_voxel_octree.clear_voxels();
 
-    Ref<FastNoiseLite> noise_generator;
-    noise_generator.instantiate();
-    noise_generator->set_noise_type(_noise_type);
-    noise_generator->set_frequency(_noise_frequency);
-
     // NOTE: This breaks if you output too many godot debug statements!
     std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
     for (int x = 0; x < terrain_chunk_size; x++)
@@ -188,7 +188,7 @@ void VoxelTerrain::create_noise_terrain_SVO()
         {
             for (int z = 0; z < terrain_chunk_size; z++)
             {
-                float noise_value = noise_generator->get_noise_3d(x, y, z);
+                float noise_value = terrain_noise_generator->get_noise_3d(x, y, z);
                 if (noise_value > _noise_voxel_spawn_threshold)
                 {
                     sparse_voxel_octree.insert_voxel(x,y,z,1);
@@ -301,7 +301,14 @@ void VoxelTerrain::_generate_mesh()
     {
         std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
 
-        _generate_culling_voxel_mesh();
+        if (_draw_toughness_debug_mesh)
+        {
+            _generate_toughness_debug_mesh();
+        }
+        else
+        {
+            _generate_culling_voxel_mesh();
+        }
 
         std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
         double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
@@ -534,6 +541,237 @@ void VoxelTerrain::_generate_culling_voxel_mesh()
     {
         array_mesh->clear_surfaces();
         array_mesh->add_surface_from_arrays(Mesh::PrimitiveType::PRIMITIVE_TRIANGLES, surface_array);
+    }
+}
+
+
+void VoxelTerrain::_generate_toughness_debug_mesh()
+{
+    /*
+     * TODO: Make this take advantage of the octree so that it only loops through existing voxels instead of checking every voxel!
+     * I can check for the existing voxels via traversal of the octree (Although maybe this is actually slower, this is something to test)
+     */
+
+    if (!_mesh_node) { return;}
+
+    //// VERTICES
+
+    std::vector<Vector3> vertices_vector;
+    PackedVector3Array vertices;
+    std::vector<int32_t> indices_vector;
+    PackedInt32Array indices;
+    std::vector<Vector3> normals_vector;
+    PackedVector3Array normals;
+    std::vector<Color> colours_vector;
+    PackedColorArray colours;
+
+    /// Generate vertices per voxel
+
+    int vertex_offset = 0;
+    for (int x = 0; x < terrain_chunk_size; x++)
+    {
+        for (int y = 0; y < terrain_chunk_size; y++)
+        {
+            for (int z = 0; z < terrain_chunk_size; z++)
+            {
+                /// Ignore empty voxels
+
+                if (sparse_voxel_octree.get_voxel(x,y,z) == 0) { continue; }
+
+                //// Render voxel faces
+                // Only render faces if the voxel adjacent to that face is empty, otherwise do not draw it (cull the face).
+
+                /// Construct vertex positions (there are 8)
+                // All faces drawn in Z shape, starting from top left.
+                // x -+: left-right
+                // y -+: bottom-top
+                // z -+: front-back
+
+                const Vector3 back_top_left = Vector3(-0.5 + x, 0.5 + y, 0.5 + z);
+                const Vector3 back_top_right = Vector3(0.5 + x, 0.5 + y, 0.5 + z);
+                const Vector3 back_bottom_left = Vector3(-0.5 + x, -0.5 + y, 0.5 + z);
+                const Vector3 back_bottom_right = Vector3(0.5 + x, -0.5 + y, 0.5 + z);
+                const Vector3 front_top_left = Vector3(-0.5 + x, 0.5 + y, -0.5 + z);
+                const Vector3 front_top_right = Vector3(0.5 + x, 0.5 + y, -0.5 + z);
+                const Vector3 front_bottom_left = Vector3(-0.5 + x, -0.5 + y, -0.5 + z);
+                const Vector3 front_bottom_right = Vector3(0.5 + x, -0.5 + y, -0.5 + z);
+
+                /// TOUGHNESS COLOUR CALCULATION
+
+                // Render between 2 colours to represent the variation between min and max toughness
+                float toughness = _get_voxel_toughness(Vector3i(x,y,z));
+                // between 0 and 1 from minimum toughness to maximum toughness
+                float toughness_factor = (toughness-MINIMUM_TOUGHNESS) / (MAXIMUM_TOUGHNESS-MINIMUM_TOUGHNESS);
+                toughness_factor = std::clamp(toughness_factor, 0.f, 1.f);
+                godot::Color voxel_colour = godot::Color(toughness_factor, 1.0f-toughness_factor, 0.f, 1.f);
+
+                /// TOP FACE
+
+                uint8_t voxel_value = 0;
+                if (y+1 < terrain_chunk_size) { voxel_value = sparse_voxel_octree.get_voxel(x,y + 1,z); };
+                if (voxel_value == 0)
+                {
+                    vertices_vector.push_back(front_top_left);
+                    vertices_vector.push_back(front_top_right);
+                    vertices_vector.push_back(back_top_left);
+                    vertices_vector.push_back(back_top_right);
+
+                    VoxelUtility::generate_colours_for_quad(colours_vector, voxel_colour);
+                    VoxelUtility::generate_indices_for_quad(indices_vector, vertex_offset);
+                    VoxelUtility::generate_normals_for_quad(normals_vector, VoxelUtility::UP);
+
+                    vertex_offset += 4;
+                }
+
+                /// BOTTOM FACE
+
+                voxel_value = 0;
+                if (y-1 >= 0) { voxel_value = sparse_voxel_octree.get_voxel(x,y - 1,z); };
+                if (voxel_value == 0)
+                {
+                    vertices_vector.push_back(back_bottom_left);
+                    vertices_vector.push_back(back_bottom_right);
+                    vertices_vector.push_back(front_bottom_left);
+                    vertices_vector.push_back(front_bottom_right);
+
+                    VoxelUtility::generate_colours_for_quad(colours_vector, voxel_colour);
+                    VoxelUtility::generate_indices_for_quad(indices_vector, vertex_offset);
+                    VoxelUtility::generate_normals_for_quad(normals_vector, VoxelUtility::DOWN);
+
+                    vertex_offset += 4;
+                }
+
+                /// LEFT FACE
+
+                voxel_value = 0;
+                if (x-1 >= 0) { voxel_value = sparse_voxel_octree.get_voxel(x - 1,y,z); };
+                if (voxel_value == 0)
+                {
+                    vertices_vector.push_back(front_top_left);
+                    vertices_vector.push_back(back_top_left);
+                    vertices_vector.push_back(front_bottom_left);
+                    vertices_vector.push_back(back_bottom_left);
+
+                    VoxelUtility::generate_colours_for_quad(colours_vector, voxel_colour);
+                    VoxelUtility::generate_indices_for_quad(indices_vector, vertex_offset);
+                    VoxelUtility::generate_normals_for_quad(normals_vector, VoxelUtility::LEFT);
+
+                    vertex_offset += 4;
+                }
+
+                /// RIGHT FACE
+
+                voxel_value = 0;
+                if (x+1 < terrain_chunk_size) { voxel_value = sparse_voxel_octree.get_voxel(x + 1,y,z); };
+                if (voxel_value == 0)
+                {
+                    vertices_vector.push_back(back_top_right);
+                    vertices_vector.push_back(front_top_right);
+                    vertices_vector.push_back(back_bottom_right);
+                    vertices_vector.push_back(front_bottom_right);
+
+                    VoxelUtility::generate_colours_for_quad(colours_vector, voxel_colour);
+                    VoxelUtility::generate_indices_for_quad(indices_vector, vertex_offset);
+                    VoxelUtility::generate_normals_for_quad(normals_vector, VoxelUtility::RIGHT);
+
+                    vertex_offset += 4;
+                }
+
+                /// FRONT FACE
+
+                voxel_value = 0;
+                if (z-1 >= 0) { voxel_value = sparse_voxel_octree.get_voxel(x,y,z-1); };
+                if (voxel_value == 0)
+                {
+                    vertices_vector.push_back(front_top_right);
+                    vertices_vector.push_back(front_top_left);
+                    vertices_vector.push_back(front_bottom_right);
+                    vertices_vector.push_back(front_bottom_left);
+
+                    VoxelUtility::generate_colours_for_quad(colours_vector, voxel_colour);
+                    VoxelUtility::generate_indices_for_quad(indices_vector, vertex_offset);
+                    VoxelUtility::generate_normals_for_quad(normals_vector, VoxelUtility::FORWARD);
+
+                    vertex_offset += 4;
+                }
+
+                /// BACK FACE
+
+                voxel_value = 0;
+                if (z+1 < terrain_chunk_size) { voxel_value = sparse_voxel_octree.get_voxel(x,y,z+1); };
+                if (voxel_value == 0)
+                {
+                    vertices_vector.push_back(back_top_left);
+                    vertices_vector.push_back(back_top_right);
+                    vertices_vector.push_back(back_bottom_left);
+                    vertices_vector.push_back(back_bottom_right);
+
+                    VoxelUtility::generate_colours_for_quad(colours_vector, voxel_colour);
+                    VoxelUtility::generate_indices_for_quad(indices_vector, vertex_offset);
+                    VoxelUtility::generate_normals_for_quad(normals_vector, VoxelUtility::BACKWARD);
+
+                    vertex_offset += 4;
+                }
+            }
+        }
+    }
+
+    // Since the voxel grid is empty don't create mesh and remove previous mesh
+    if (vertices_vector.size() <= 0)
+    {
+        Ref<Mesh> mesh = _mesh_node->get_mesh();
+        if(ArrayMesh* array_mesh = Object::cast_to<ArrayMesh>(mesh.ptr()))
+        {
+            array_mesh->clear_surfaces();
+        }
+        return;
+    }
+
+    /// Pack data into arrays
+
+    vertices.resize(vertices_vector.size());
+    for (int i = 0; i < vertices_vector.size(); i ++)
+    {
+        vertices.set(i, vertices_vector[i]);
+    }
+    indices.resize(indices_vector.size());
+    for (int i = 0; i < indices_vector.size(); i ++)
+    {
+        indices.set(i, indices_vector[i]);
+    }
+    normals.resize(normals_vector.size());
+    for (int i = 0; i < normals_vector.size(); i ++)
+    {
+        normals.set(i, normals_vector[i]);
+    }
+    colours.resize(colours_vector.size());
+    for (int i = 0; i < colours_vector.size(); i ++)
+    {
+        colours.set(i, colours_vector[i]);
+    }
+
+    /// Create surface array from generated mesh data
+
+    Array surface_array;
+    surface_array.resize(Mesh::ArrayType::ARRAY_MAX);
+    surface_array[(int)Mesh::ArrayType::ARRAY_VERTEX] = vertices;
+    surface_array[(int)Mesh::ArrayType::ARRAY_INDEX] = indices;
+    surface_array[(int)Mesh::ArrayType::ARRAY_NORMAL] = normals;
+    surface_array[(int)Mesh::ArrayType::ARRAY_COLOR] = colours;
+
+    /// Create mesh from Surface Array
+
+    Ref<Mesh> mesh = _mesh_node->get_mesh();
+    if(ArrayMesh* array_mesh = Object::cast_to<ArrayMesh>(mesh.ptr()))
+    {
+        array_mesh->clear_surfaces();
+        array_mesh->add_surface_from_arrays(Mesh::PrimitiveType::PRIMITIVE_TRIANGLES, surface_array);
+
+        // Set material so colours can be used in the mesh
+        Ref<StandardMaterial3D> material;
+        material.instantiate();
+        material->set_flag(godot::BaseMaterial3D::FLAG_ALBEDO_FROM_VERTEX_COLOR, true);
+        array_mesh->surface_set_material(0, material);
     }
 }
 

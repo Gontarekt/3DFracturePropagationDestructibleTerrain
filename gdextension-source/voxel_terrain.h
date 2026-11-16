@@ -16,7 +16,18 @@ public:
     SparseVoxelOctree sparse_voxel_octree;
 
 private:
+    // Based these toughness values roughly on the article: https://dl.acm.org/doi/epdf/10.1145/2766896
+    // Toughness: 1.0E+5 +50%
+    static constexpr float MINIMUM_TOUGHNESS = 100000.f;
+    static constexpr float MAXIMUM_TOUGHNESS = 150000.f;
+
+    Ref<FastNoiseLite> terrain_noise_generator;
+    Ref<FastNoiseLite> toughness_noise_generator;
+    //int terrain_noise_seed;
+    //int toughness_noise_seed;
+
     bool _check_disconnected_components = false;
+    bool _draw_toughness_debug_mesh = false;
     float _noise_frequency;
     float _noise_voxel_spawn_threshold;
     FastNoiseLite::NoiseType _noise_type;
@@ -42,6 +53,8 @@ public:
 
   void set_check_disconnected_components(const bool new_check_disconnected_components) { _check_disconnected_components = new_check_disconnected_components; };
   bool get_check_disconnected_components() const { return _check_disconnected_components; }
+  void set_draw_toughness_debug_mesh(const bool new_draw_toughness_debug_mesh) { _draw_toughness_debug_mesh = new_draw_toughness_debug_mesh; };
+  bool get_draw_toughness_debug_mesh() const { return _draw_toughness_debug_mesh; }
   void set_noise_frequency(const float new_noise_frequency) { _noise_frequency = new_noise_frequency; };
   float get_noise_frequency() const { return _noise_frequency; }
   void set_noise_voxel_spawn_threshold(const float new_noise_voxel_spawn_threshold) { _noise_voxel_spawn_threshold = new_noise_voxel_spawn_threshold; };
@@ -56,6 +69,7 @@ private:
   void _process_geometry_updates() override;
   void _generate_mesh() override;
   void _generate_culling_voxel_mesh();
+  void _generate_toughness_debug_mesh();
   void _generate_collider() override;
 
   void _propagate_fracture(Vector3i voxel_position, float stress_intensity);

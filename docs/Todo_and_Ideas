@@ -15,12 +15,11 @@ for stress intensity so I can use that for reference.
 Chunks can be stored in an unordered_map based on position. Positions will simply be in increments of 1,
 e.g. (0,0,0) (1,0,0) (2,0,0). To get the actual world position the position vectors would then be multiplied
 by the size of the chunks. E.g. for 64x64x64 chunks, the positions become (0,0,0) (64,0,0) (128,0,0).
+- extract_voxel_group() function handling for multiple chunks. The groups should also include voxels in adjacent chunks.
+
 - Move naive voxel culling meshing logic to VoxelNode class. Can make some interface functions for getting a voxel at a position.
 - Move connected-component logic to VoxelNode (Object & Terrain should both have this functionality)
-- extract_voxel_group() function handling for multiple chunks. The groups should also include voxels in adjacent chunks.
-- Possibly make a more efficient vector3i than godot's implementation. My voxels only need a byte for each axis, 0 to 256 max. Chunks should
-probably never reach a size of 256 or greater, 128 is even a bit too much.
-
+- Move fracture propagation logic to voxel node
 
 ## IDEAS
 
@@ -29,5 +28,8 @@ Voxel Disconnected Component Algorithm:
 But need to make sure it doesn't do it each time a voxel is removed in fracture propagation which will use the same function.
 - Can have a boolean on a terrain chunk for whether it has been modified since generation (set to true after remove_voxel() call or even when a voxel is added)
 Then this can be used to check adjacent chunks, ignoring chunks that will be used as anchors since they are the main body of terrain.
+
+- Possibly make a more efficient vector3i data type than godot's implementation. My voxels only need a byte for each axis, 0 to 256 max. Chunks should
+probably never reach a size of 256 or greater, 128 is even a bit too much.
 
 ## NOTES

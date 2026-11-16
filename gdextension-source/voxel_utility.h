@@ -4,6 +4,7 @@
 #include <libmorton/morton.h>
 #include <cstdint>
 #include <vector>
+#include "godot_cpp/variant/color.hpp"
 
 namespace VoxelUtility
 {
@@ -65,5 +66,12 @@ namespace VoxelUtility
         normals.push_back(normal);
         normals.push_back(normal);
         normals.push_back(normal);
+    }
+    inline void generate_colours_for_quad(std::vector<godot::Color>& colours, const godot::Color colour)
+    {
+        colours.push_back(colour);
+        colours.push_back(colour);
+        colours.push_back(colour);
+        colours.push_back(colour);
     }
 }
