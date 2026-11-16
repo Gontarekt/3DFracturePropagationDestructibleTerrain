@@ -4,7 +4,6 @@
 #include "voxel_utility.h"
 #include <godot_cpp/classes/fast_noise_lite.hpp>
 #include <godot_cpp/classes/static_body3d.hpp>
-#include <stack>
 
 
 namespace godot {

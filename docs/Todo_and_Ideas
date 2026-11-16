@@ -33,4 +33,7 @@ But need to make sure it doesn't do it each time a voxel is removed in fracture 
 - Can have a boolean on a terrain chunk for whether it has been modified since generation (set to true after remove_voxel() call or even when a voxel is added)
 Then this can be used to check adjacent chunks, ignoring chunks that will be used as anchors since they are the main body of terrain.
 
+Fracture Propagation:
+- Similar to how I used a vector of voxel positions for flood fill to avoid recursion, I could do the same for fracture propagation, and use this to defer fracturing over multiple frames! I could also use deferred computation for the flood fill (and CCL's in general).
+
 ## NOTES

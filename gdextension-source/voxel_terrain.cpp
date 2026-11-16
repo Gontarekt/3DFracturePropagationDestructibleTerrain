@@ -6,6 +6,7 @@
 #include "godot_cpp/variant/utility_functions.hpp"
 #include "voxel_object.h"
 #include "voxel_utility.h"
+#include "godot_cpp/classes/shape3d.hpp"
 
 
 using namespace godot;
@@ -418,6 +419,17 @@ void VoxelTerrain::_generate_culling_voxel_mesh()
         }
     }
 
+    // Since the voxel grid is empty don't create mesh and remove previous mesh
+    if (vertices_vector.size() <= 0)
+    {
+        Ref<Mesh> mesh = _mesh_node->get_mesh();
+        if(ArrayMesh* array_mesh = Object::cast_to<ArrayMesh>(mesh.ptr()))
+        {
+            array_mesh->clear_surfaces();
+        }
+        return;
+    }
+
     /// Pack data into arrays
 
     vertices.resize(vertices_vector.size());
@@ -467,7 +479,17 @@ void VoxelTerrain::_generate_collider()
     // TODO: Use the collision node I generate on _ready() and procedurally generate the mesh myself
     // Can hopefully use the same algorithm as mesh generation and that may be way faster than trimesh generation done by godot.
 
-    if (!_mesh_node) { return; }
+    // Don't generate collider if there is no mesh (And therefore no voxel grid)
+    if (!_mesh_node || !_mesh_node->get_mesh().ptr() || _mesh_node->get_mesh()->get_surface_count() == 0)
+    {
+        if (_collider_node)
+        {
+            // Assign an empty collider
+            Ref<Shape3D> empty_collider;
+            _collider_node->set_shape(empty_collider);
+        }
+        return;
+    }
 
     std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
 
