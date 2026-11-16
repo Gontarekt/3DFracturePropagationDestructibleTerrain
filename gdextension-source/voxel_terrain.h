@@ -33,6 +33,7 @@ public:
   void _process(double delta) override;
 
   void remove_voxel(Vector3 voxel_position) override;
+  void initiate_fracture_propagation(Vector3 voxel_position, float initial_force);
 
   void create_solid_cube_SVO();
   void create_noise_terrain_SVO();
@@ -56,11 +57,16 @@ private:
   void _generate_mesh() override;
   void _generate_culling_voxel_mesh();
   void _generate_collider() override;
+
+  void _propagate_fracture(Vector3i voxel_position, float stress_intensity);
+  float _get_voxel_toughness(Vector3i voxel_position);
+  // TODO: Don't know what I need for this yet
+  float _calculate_stress_intensity() {};
+
   // Generates new voxel grid rigid bodies by running a connected-component
   // algorithm to find groups of voxels disconnected from the main body of
   // terrain
   void _generate_bodies_from_disconnected_voxels();
-
   // Uses a Connected Component Labelling (CCL)
   // algorithm to find and remove voxels, allocating them into different grids
   // based on what group of voxels they are connected to.

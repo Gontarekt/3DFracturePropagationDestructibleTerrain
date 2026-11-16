@@ -34,6 +34,8 @@ void VoxelTerrain::_bind_methods()
 	ClassDB::bind_method(D_METHOD("get_noise_voxel_spawn_threshold"), &VoxelTerrain::get_noise_voxel_spawn_threshold);
 	ClassDB::bind_method(D_METHOD("set_noise_voxel_spawn_threshold", "new_noise_voxel_spawn_threshold"), &VoxelTerrain::set_noise_voxel_spawn_threshold);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "noise_voxel_spawn_threshold"), "set_noise_voxel_spawn_threshold", "get_noise_voxel_spawn_threshold");
+
+	ClassDB::bind_method(D_METHOD("initiate_fracture_propagation", "voxel_position", "initial_force"), &VoxelTerrain::initiate_fracture_propagation);
 }
 
 
@@ -77,6 +79,68 @@ void VoxelTerrain::remove_voxel(Vector3 voxel_position)
 {
     //UtilityFunctions::print("VoxelTerrain remove_voxel()");
     sparse_voxel_octree.insert_voxel(voxel_position.x, voxel_position.y, voxel_position.z, 0);
+}
+
+
+void VoxelTerrain::initiate_fracture_propagation(Vector3 voxel_position, float initial_force)
+{
+    /*
+     * Steps:
+     * - Calculate initial stress intensity, if higher than voxel toughness, begin propagation loop
+     * - Check for disconnected voxels
+     * - Regenerate mesh & collider
+     */
+
+    godot::UtilityFunctions::print("\nVoxelTerrain::initiate_fracture_propagation()");
+    remove_voxel(voxel_position); // TEMP
+
+    // TEST
+    godot::UtilityFunctions::print("VoxelToughness: ", _get_voxel_toughness(voxel_position));
+    godot::UtilityFunctions::print("VoxelToughness +Vector3i(1,0,0): ", _get_voxel_toughness(voxel_position+Vector3i(1,0,0)));
+    godot::UtilityFunctions::print("VoxelToughness +Vector3i(50,0,0): ", _get_voxel_toughness(voxel_position+Vector3i(50,0,0)));
+    // TEST END
+
+    bool fracture_initiated = false;
+    std::vector<Vector3i> fracture_front_voxels;
+
+    // Check if fracture has enough force to initiate
+
+    /// TODO
+
+    // If fracture has enough force to break the first voxel, then propagate fracture.
+    if (fracture_initiated)
+    {
+        while (!fracture_front_voxels.empty())
+        {
+            //_propagate_fracture(fracture_front_voxels.back());
+            //fracture_front_voxels.pop_back();
+        }
+        _generate_bodies_from_disconnected_voxels();
+    }
+}
+
+
+float VoxelTerrain::_get_voxel_toughness(Vector3i voxel_position)
+{
+    Ref<FastNoiseLite> noise_generator;
+    noise_generator.instantiate();
+    noise_generator->set_noise_type(FastNoiseLite::TYPE_SIMPLEX);
+    noise_generator->set_frequency(0.02);
+
+    // Expected output of -1 to 1 that is spatially varied
+    float noise_value = noise_generator->get_noise_3d(voxel_position.x, voxel_position.y, voxel_position.z);
+    // Convert from (-1 to 1) to (0 to 1)
+    noise_value += 1;
+    noise_value /= 2;
+
+    // Based these toughness values roughly on the article: https://dl.acm.org/doi/epdf/10.1145/2766896
+    // Toughness: 1.0E+5 +50%
+    constexpr float MINIMUM_TOUGHNESS = 100000.f;
+    constexpr float MAXIMUM_TOUGHNESS = 150000.f;
+    float toughness = 0.f;
+    // Interpolate between a minimum and maximum toughness based on the noise value
+    toughness = MINIMUM_TOUGHNESS + noise_value * (MAXIMUM_TOUGHNESS - MINIMUM_TOUGHNESS);
+    return toughness;
 }
 
 
@@ -512,6 +576,39 @@ void VoxelTerrain::_generate_collider()
 }
 
 
+void VoxelTerrain::_propagate_fracture(Vector3i voxel_position, float stress_intensity)
+{
+
+}
+
+
+void VoxelTerrain::_generate_bodies_from_disconnected_voxels()
+{
+    std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
+
+    // Find and remove the disconnected voxels from the terrain's voxel grid
+    std::vector<VoxelUtility::VoxelGrid> disconnected_voxel_grids = _extract_disconnected_voxel_groups();
+
+    // Create a new RigidBody Voxel Grid in the scene for each disconnected voxel grid.
+    // Position it relative to the terrain chunk where the voxel grid originated from.
+    for (const auto& [voxel_vector, dimensions, grid_offset] : disconnected_voxel_grids)
+    {
+        VoxelObject* new_voxel_object = memnew(VoxelObject);
+        new_voxel_object->initialise(dimensions, voxel_vector);
+        get_parent()->add_child(new_voxel_object);
+        // Make sure to apply scale before setting the global position or they will not match at scales other than 1!
+        new_voxel_object->set_scale(get_scale());
+        new_voxel_object->set_global_position(get_global_position() + (get_scale() * grid_offset));
+    }
+
+    std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
+    double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+    UtilityFunctions::print("\nVoxelTerrain connected-component scan and body generation took ", elapsed_time, " ms");
+
+    _mesh_needs_generated = true;
+}
+
+
 std::vector<VoxelUtility::VoxelGrid> VoxelTerrain::_extract_disconnected_voxel_groups()
 {
     return _flood_filled_connected_component_voxel_extraction();
@@ -643,58 +740,4 @@ void VoxelTerrain::_flood_fill(const int x, const int y, const int z, std::vecto
         voxels_to_scan.emplace_back(x, y, z-1);
         voxels_to_scan.emplace_back(x, y, z+1);
     }
-}
-
-
-void VoxelTerrain::_generate_bodies_from_disconnected_voxels()
-{
-    std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
-
-    // Find and remove the disconnected voxels from the terrain's voxel grid
-    std::vector<VoxelUtility::VoxelGrid> disconnected_voxel_grids = _extract_disconnected_voxel_groups();
-
-    // Create a new RigidBody Voxel Grid in the scene for each disconnected voxel grid.
-    // Position it relative to the terrain chunk where the voxel grid originated from.
-    for (const auto& [voxel_vector, dimensions, grid_offset] : disconnected_voxel_grids)
-    {
-        VoxelObject* new_voxel_object = memnew(VoxelObject);
-        new_voxel_object->initialise(dimensions, voxel_vector);
-        get_parent()->add_child(new_voxel_object);
-        // Make sure to apply scale before setting the global position or they will not match at scales other than 1!
-        new_voxel_object->set_scale(get_scale());
-        new_voxel_object->set_global_position(get_global_position() + (get_scale() * grid_offset));
-    }
-
-    /*TEST*/
-    VoxelUtility::VoxelGrid voxel_grid;
-    voxel_grid.offset_in_parent_grid = Vector3i(0,5,0);
-    bool is_grid_empty = true;
-    for (int i = 0; i < 32; i++)
-    {
-        Vector3 voxel_position = Vector3(i,0,0) +  voxel_grid.offset_in_parent_grid;
-        VoxelUtility::Voxel voxel = sparse_voxel_octree.get_voxel(voxel_position.x, voxel_position.y, voxel_position.z);
-        voxel_grid.voxels.push_back(voxel);
-        if (voxel != 0) { is_grid_empty = false; }
-        remove_voxel(voxel_position);
-    }
-    if (!is_grid_empty)
-    {
-        voxel_grid.dimensions = Vector3i(32,1,1);
-        VoxelObject* new_voxel_object = memnew(VoxelObject);
-        new_voxel_object->initialise(voxel_grid.dimensions, voxel_grid.voxels);
-        get_parent()->add_child(new_voxel_object);
-        new_voxel_object->set_scale(get_scale());
-        // Local position also works since I use the same parent.
-        // NOTE: position should be offset by the lowest position voxel in the grid so
-        // that it spawns in the correct position relative to the original grid (the terrain).
-        new_voxel_object->set_global_position(get_global_position() + ( voxel_grid.offset_in_parent_grid * get_scale()));
-        //new_voxel_object->set_freeze_enabled(true);
-    }
-    /*TEST END*/
-
-    std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
-    double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
-    UtilityFunctions::print("\nVoxelTerrain connected-component scan and body generation took ", elapsed_time, " ms");
-
-    _mesh_needs_generated = true;
 }

@@ -4,12 +4,9 @@
 
 ## TODO
 
-- Ethics Submission, remember to mention that the honours project is computer based.
-
-- Setup fracture propagation function
-    - Should run the core steps: fracture_initiation(), fracture_propagation(), _generate_bodies_from_disconnected_voxels()
-    then trigger mesh & collider generation.
-    - Raycast should trigger fracture_propagation() instead of removing_voxel().
+- Implement Fracture Propagation. Will need to research continuum mechanics as well as fracture mechanics.
+'High-resolution brittle fracture simulation with boundary elements' article has source code and provides formulas
+for stress intensity so I can use that for reference.
 
 - Raycast VoxelGrid step-through logic (Currently can only hit boundary voxels due to the simple convex collider).
 - Fix issue with disconnected voxel fragments phasing through terrain
@@ -32,8 +29,5 @@ Voxel Disconnected Component Algorithm:
 But need to make sure it doesn't do it each time a voxel is removed in fracture propagation which will use the same function.
 - Can have a boolean on a terrain chunk for whether it has been modified since generation (set to true after remove_voxel() call or even when a voxel is added)
 Then this can be used to check adjacent chunks, ignoring chunks that will be used as anchors since they are the main body of terrain.
-
-Fracture Propagation:
-- Similar to how I used a vector of voxel positions for flood fill to avoid recursion, I could do the same for fracture propagation, and use this to defer fracturing over multiple frames! I could also use deferred computation for the flood fill (and CCL's in general).
 
 ## NOTES
