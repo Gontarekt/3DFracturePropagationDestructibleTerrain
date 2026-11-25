@@ -65,12 +65,20 @@ void VoxelObject::_process(double delta)
 }
 
 
-void VoxelObject::remove_voxel(Vector3 voxel_position)
+void VoxelObject::remove_voxel(Vector3i voxel_position)
 {
     UtilityFunctions::print("VoxelObject remove_voxel()");
     int voxel_index = VoxelUtility::voxel_index_from_position(_size.x, _size.y, voxel_position);
     _voxels->at(voxel_index) = 0;
 }
+
+
+VoxelUtility::Voxel VoxelObject::get_voxel(Vector3i voxel_position)
+{
+    int voxel_index = VoxelUtility::voxel_index_from_position(_size.x, _size.y, voxel_position);
+    return _voxels->at(voxel_index);
+}
+
 
 
 ////////////////////

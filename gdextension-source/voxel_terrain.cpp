@@ -89,10 +89,16 @@ void VoxelTerrain::_process(double delta)
 // Public Functions
 
 
-void VoxelTerrain::remove_voxel(Vector3 voxel_position)
+void VoxelTerrain::remove_voxel(Vector3i voxel_position)
 {
     //UtilityFunctions::print("VoxelTerrain remove_voxel()");
     sparse_voxel_octree.insert_voxel(voxel_position.x, voxel_position.y, voxel_position.z, 0);
+}
+
+
+VoxelUtility::Voxel VoxelTerrain::get_voxel(Vector3i voxel_position)
+{
+     return sparse_voxel_octree.get_voxel(voxel_position.x, voxel_position.y, voxel_position.z);
 }
 
 
@@ -106,30 +112,39 @@ void VoxelTerrain::initiate_fracture_propagation(Vector3 voxel_position, float i
      */
 
     godot::UtilityFunctions::print("\nVoxelTerrain::initiate_fracture_propagation()");
-    remove_voxel(voxel_position); // TEMP
-
-    // TEST
-    godot::UtilityFunctions::print("VoxelToughness: ", _get_voxel_toughness(voxel_position));
-    godot::UtilityFunctions::print("VoxelToughness +Vector3i(1,0,0): ", _get_voxel_toughness(voxel_position+Vector3i(1,0,0)));
-    godot::UtilityFunctions::print("VoxelToughness +Vector3i(50,0,0): ", _get_voxel_toughness(voxel_position+Vector3i(50,0,0)));
-    // TEST END
-
     bool fracture_initiated = false;
-    std::vector<Vector3i> fracture_front_voxels;
+    std::vector<VoxelUtility::FractureFront> fracture_front_voxels;
 
     // Check if fracture has enough force to initiate
+    // Starting with a naive implementation
+    float current_voxel_toughness = _get_voxel_toughness(voxel_position);
+    godot::UtilityFunctions::print("VoxelToughness: ", _get_voxel_toughness(voxel_position)); // TEST
+    float stress_intensity = initial_force;
+    if (stress_intensity > current_voxel_toughness)
+    {
+        fracture_initiated = true;
+        fracture_front_voxels.push_back({voxel_position, stress_intensity});
+        remove_voxel(voxel_position);
+    }
 
-    /// TODO
-
-    // If fracture has enough force to break the first voxel, then propagate fracture.
+    // If impact has enough force to break the first voxel, then propagate fracture.
     if (fracture_initiated)
     {
+        // Propagate Fracture
+        std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
         while (!fracture_front_voxels.empty())
         {
-            //_propagate_fracture(fracture_front_voxels.back());
-            //fracture_front_voxels.pop_back();
+            const VoxelUtility::FractureFront fracture_front = fracture_front_voxels.back();
+            _propagate_fracture(fracture_front_voxels, fracture_front.voxel_position, fracture_front.stress_intensity);
         }
-        _generate_bodies_from_disconnected_voxels();
+        std::chrono::time_point<std::chrono::steady_clock> end_time = std::chrono::steady_clock::now();
+        double elapsed_time = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+        UtilityFunctions::print("VoxelTerrain fracture propagation took ", elapsed_time, " ms");
+        // Create new voxel objects from disconnected voxels
+        //_generate_bodies_from_disconnected_voxels(); // DISABLED FOR NOW SO I CAN SEE THE FRACTURE
+        // Trigger mesh & collider regeneration
+        _mesh_needs_generated = true;
+        _collider_needs_generated = true;
     }
 }
 
@@ -164,6 +179,8 @@ void VoxelTerrain::create_noise_terrain_SVO()
 {
     // Clear Previous Voxels
     sparse_voxel_octree.clear_voxels();
+
+     UtilityFunctions::print("Noise Type: ", _noise_type);
 
     // NOTE: This breaks if you output too many godot debug statements!
     std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
@@ -799,9 +816,61 @@ void VoxelTerrain::_generate_collider()
 }
 
 
-void VoxelTerrain::_propagate_fracture(Vector3i voxel_position, float stress_intensity)
+void VoxelTerrain::_propagate_fracture(std::vector<VoxelUtility::FractureFront>& fracture_fronts,  Vector3i voxel_position, float stress_intensity)
 {
+    std::vector<std::pair<float, Vector3i>> surrounding_voxel_toughness;
+    // Check 6 surrounding voxels.
+    // Really naive solution just to see some sort of fracturing.
+    if (voxel_position.x < terrain_chunk_size)
+    {
+        const Vector3i offset_1 = voxel_position + Vector3i(1,0,0);
+        surrounding_voxel_toughness.push_back({_get_voxel_toughness(offset_1), offset_1});
+    }
+    if (voxel_position.x > 0)
+    {
+        const Vector3i offset_2 = voxel_position - Vector3i(1,0,0);
+        surrounding_voxel_toughness.push_back({_get_voxel_toughness(offset_2), offset_2});
+    }
+    if (voxel_position.y < terrain_chunk_size)
+    {
+        const Vector3i offset_3 = voxel_position + Vector3i(0,1,0);
+        surrounding_voxel_toughness.push_back({_get_voxel_toughness(offset_3), offset_3});
+    }
+    if (voxel_position.y > 0)
+    {
+        const Vector3i offset_4 = voxel_position - Vector3i(0,1,0);
+        surrounding_voxel_toughness.push_back({_get_voxel_toughness(offset_4), offset_4});
+    }
+    if (voxel_position.z < terrain_chunk_size)
+    {
+        const Vector3i offset_5 = voxel_position + Vector3i(0,0,1);
+        surrounding_voxel_toughness.push_back({_get_voxel_toughness(offset_5), offset_5});
+    }
+    if (voxel_position.z > 0)
+    {
+        const Vector3i offset_6 = voxel_position - Vector3i(0,0,1);
+        surrounding_voxel_toughness.push_back({_get_voxel_toughness(offset_6), offset_6});
+    }
 
+    // Sort so lowest toughness first
+    std::sort(surrounding_voxel_toughness.begin(), surrounding_voxel_toughness.end(),
+        [](const auto& left, const auto& right) {
+            return left.first < right.first;
+        });
+    // DEBUG
+    //godot::UtilityFunctions::print("SurroundingVoxelToughness: ", surrounding_voxel_toughness[0].first, " ",
+    //    surrounding_voxel_toughness[1].first, " ",  surrounding_voxel_toughness[2].first);
+    const Vector3i& voxel_to_propagate_to = surrounding_voxel_toughness[0].second;
+    if (stress_intensity > surrounding_voxel_toughness[0].first &&
+        sparse_voxel_octree.get_voxel(voxel_to_propagate_to.x, voxel_to_propagate_to.y, voxel_to_propagate_to.z) != 0)
+    {
+        fracture_fronts.pop_back();
+        remove_voxel(voxel_position);
+        fracture_fronts.push_back({surrounding_voxel_toughness[0].second, stress_intensity});
+    }
+    else {
+        fracture_fronts.pop_back();
+    }
 }
 
 

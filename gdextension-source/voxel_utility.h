@@ -22,6 +22,11 @@ namespace VoxelUtility
         godot::Vector3i position;
         Voxel voxel;
     };
+    struct FractureFront {
+        godot::Vector3i voxel_position;
+        float stress_intensity;
+        godot::Vector3i forward_vector;
+    };
 
     inline const godot::Vector3i UP = { 0, 1, 0 };
     inline const godot::Vector3i DOWN = { 0, -1, 0 };

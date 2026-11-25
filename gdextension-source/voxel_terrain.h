@@ -27,7 +27,7 @@ private:
     //int toughness_noise_seed;
 
     bool _check_disconnected_components = false;
-    bool _draw_toughness_debug_mesh = false;
+    bool _draw_toughness_debug_mesh = true;
     float _noise_frequency;
     float _noise_voxel_spawn_threshold;
     FastNoiseLite::NoiseType _noise_type;
@@ -43,7 +43,8 @@ public:
   void _ready() override;
   void _process(double delta) override;
 
-  void remove_voxel(Vector3 voxel_position) override;
+  void remove_voxel(Vector3i voxel_position) override;
+  VoxelUtility::Voxel get_voxel(Vector3i voxel_position) override;
   void initiate_fracture_propagation(Vector3 voxel_position, float initial_force);
 
   void create_solid_cube_SVO();
@@ -72,10 +73,10 @@ private:
   void _generate_toughness_debug_mesh();
   void _generate_collider() override;
 
-  void _propagate_fracture(Vector3i voxel_position, float stress_intensity);
+  void _propagate_fracture(std::vector<VoxelUtility::FractureFront>& fracture_fronts, Vector3i voxel_position, float stress_intensity);
   float _get_voxel_toughness(Vector3i voxel_position);
   // TODO: Don't know what I need for this yet
-  float _calculate_stress_intensity() {};
+  float _calculate_stress_intensity() { return -1.f; }; // TEMP RETURN
 
   // Generates new voxel grid rigid bodies by running a connected-component
   // algorithm to find groups of voxels disconnected from the main body of

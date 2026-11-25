@@ -36,7 +36,8 @@ public:
 
 	// Public Functions
 
-	void remove_voxel(Vector3 voxel_position) override;
+	void remove_voxel(Vector3i voxel_position) override;
+	VoxelUtility::Voxel get_voxel(Vector3i voxel_position) override;
 
 	// Getters & Setters
 

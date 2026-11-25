@@ -9,7 +9,7 @@
 #pragma once
 #include <godot_cpp/classes/mesh_instance3d.hpp>
 #include <godot_cpp/classes/collision_shape3d.hpp>
-#include "voxel_utility.h"
+#include <voxel_utility.h>
 
 // This binds all properties and methods defined in VoxelNode to Godot.
 // This macro should be called in _bind_methods() of derived classes.
@@ -29,6 +29,7 @@
 	    "set_num_mesh_generation_tests_to_run", "get_num_mesh_generation_tests_to_run"); \
 	\
 	godot::ClassDB::bind_method(godot::D_METHOD("remove_voxel", "voxel_position"), &class_name::remove_voxel); \
+	godot::ClassDB::bind_method(godot::D_METHOD("get_voxel", "voxel_position"), &class_name::get_voxel); \
 
 
 // May have to do this since Godot's macros for binding properties and methods doesn't recognize non-godot base classes properties/methods
@@ -40,7 +41,8 @@ class VoxelNode {
         VoxelNode();
         ~VoxelNode() = default;
 
-        virtual void remove_voxel(godot::Vector3 voxel_position) = 0;
+        virtual void remove_voxel(godot::Vector3i voxel_position) = 0;
+        virtual VoxelUtility::Voxel get_voxel(godot::Vector3i voxel_position) = 0;
 
         // Getters & Setters
 

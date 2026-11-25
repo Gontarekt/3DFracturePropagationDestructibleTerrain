@@ -49,8 +49,8 @@ func _process(_delta: float) -> void:
 
 			# Nudge the collision into the voxel so that the voxel position can then be found by rounding
 			# Otherwise it will be on the exact boundary of a voxel and will be unclear which voxel it hit.
-			collision_point_in_local_space -= _ray.get_collision_normal() * 0.1
-			var voxel_position: Vector3 = collision_point_in_local_space.round()
+			var offset_local_space_collision_point: Vector3 = collision_point_in_local_space - (_ray.get_collision_normal() * 0.1)
+			var voxel_position: Vector3i = offset_local_space_collision_point.round()
 			print ("Voxel Position: ", "%0.3v" % voxel_position)
 			if collided_object is VoxelObject:
 				var collided_voxel_object = collided_object as VoxelObject
@@ -64,6 +64,30 @@ func _process(_delta: float) -> void:
 			elif collided_object is VoxelTerrain:
 				#print ("VoxelTerrain detected")
 				var collided_voxel_terrain = collided_object as VoxelTerrain
+
+				# #If an empty voxel was hit, step through the terrain
+				# if collided_voxel_terrain.get_voxel(voxel_position) == 0:
+				# 	# TODO: I think direction is the issue, need to make this direction is accurate in the local space of the object.
+				# 	# I Might be able to do this by getting the global space direction of the raycast, offseting the collision point, converting both
+				# 	# into local space of the object then getting direction from that.
+				# 	var ray_direction_global: Vector3 = (_ray.target_position - _ray.global_position).normalized()
+				# 	var offset_collision_point_in_local_space: Vector3 = collided_object.to_local(collision_point+ray_direction_global)
+				# 	var ray_direction: Vector3 = (offset_collision_point_in_local_space - collision_point_in_local_space).normalized()
+
+				# 	var collided_voxel_position: Vector3 = collided_object.to_local(collision_point) + (ray_direction)
+
+				# 	var MAX_COLLISION_STEPS : int = 64
+				# 	var found_valid_voxel: bool = false
+				# 	var collision_step : int = 0;
+				# 	while (!found_valid_voxel and collision_step < MAX_COLLISION_STEPS):
+				# 		collision_step += 1
+				# 		collided_voxel_position += ray_direction
+				# 		collided_voxel_position = collided_voxel_position.round()
+				# 		print ("GODOT Stepping through voxel grid to find valid voxel","%0.3v" % collided_voxel_position)
+				# 		if collided_voxel_terrain.get_voxel(collided_voxel_position) != 0:
+				# 			found_valid_voxel = true;
+				# 			voxel_position = collided_voxel_position.round()
+
 				#collided_voxel_terrain.remove_voxel(voxel_position)
 				collided_voxel_terrain.initiate_fracture_propagation(voxel_position, impact_force)
 				collided_voxel_terrain.set_mesh_needs_generated(true)

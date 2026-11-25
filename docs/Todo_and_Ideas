@@ -4,6 +4,13 @@
 
 ## TODO
 
+- BUG: ImGui control for terrain noise type is not working, only the godot editor control works currently.
+The issue might be that the terrain can't change terrain noise type after the application has started...
+- Add controls for toughness noise generation type as well as frequency.
+
+- Tweak the toughness so that it is logarithmic and has a steeper blend from max toughness to low toughness.
+The object shapes I want fractures to form should have high toughness with comparatively very low toughness surrounding them to encourage separation.
+
 - Implement Fracture Propagation. Will need to research continuum mechanics as well as fracture mechanics.
 'High-resolution brittle fracture simulation with boundary elements' article has source code and provides formulas
 for stress intensity so I can use that for reference.
