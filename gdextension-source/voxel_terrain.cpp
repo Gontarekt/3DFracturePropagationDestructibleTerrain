@@ -134,21 +134,6 @@ void VoxelTerrain::initiate_fracture_propagation(Vector3 voxel_position, float i
 }
 
 
-float VoxelTerrain::_get_voxel_toughness(Vector3i voxel_position)
-{
-    // Expected output of -1 to 1 that is spatially varied
-    float noise_value = toughness_noise_generator->get_noise_3d(voxel_position.x, voxel_position.y, voxel_position.z);
-    // Convert from (-1 to 1) to (0 to 1)
-    noise_value += 1;
-    noise_value /= 2;
-
-    float toughness = 0.f;
-    // Interpolate between a minimum and maximum toughness based on the noise value
-    toughness = MINIMUM_TOUGHNESS + noise_value * (MAXIMUM_TOUGHNESS - MINIMUM_TOUGHNESS);
-    return toughness;
-}
-
-
 void VoxelTerrain::create_solid_cube_SVO()
 {
     // Clear Previous Voxels
@@ -817,6 +802,21 @@ void VoxelTerrain::_generate_collider()
 void VoxelTerrain::_propagate_fracture(Vector3i voxel_position, float stress_intensity)
 {
 
+}
+
+
+float VoxelTerrain::_get_voxel_toughness(Vector3i voxel_position)
+{
+    // Expected output of -1 to 1 that is spatially varied
+    float noise_value = toughness_noise_generator->get_noise_3d(voxel_position.x, voxel_position.y, voxel_position.z);
+    // Convert from (-1 to 1) to (0 to 1)
+    noise_value += 1;
+    noise_value /= 2;
+
+    float toughness = 0.f;
+    // Interpolate between a minimum and maximum toughness based on the noise value
+    toughness = MINIMUM_TOUGHNESS + noise_value * (MAXIMUM_TOUGHNESS - MINIMUM_TOUGHNESS);
+    return toughness;
 }
 
 

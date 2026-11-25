@@ -23,6 +23,18 @@ by the size of the chunks. E.g. for 64x64x64 chunks, the positions become (0,0,0
 
 ## IDEAS
 
+SVO IDEA:
+NOTE THERE IS AN ISSUE WITH THIS: Insertion & deletion suddenly becomes very expensive as every index offset must be modified, and when a child is
+inserted each node after it will after have to be moved in memory (This is expensive!).
+Make a new SVO design that uses 'child descriptor' structs (can just call them nodes in my implementation)
+The SVO will be stored entirely in one std::vector<Node>, this way they will be stored contiguously in memory!!!
+Don't use unique ptrs for the nodes as this will change their placement in memory. Don't use pointers either!
+Ideally if I do this it will be transferrable to the GPU!
+Each Child Descriptor will store 32 bits (uint16, uint8, uint8).
+The algorithm for insertion and finding voxels will handle how those bits are used.
+The 16 bits will be used as a relative index offset from the current node to its first child, and the 2 8-bit masks will represent
+whether each child is a valid voxel and whether it is a leaf (if it isn't a leaf but is valid, then there is a node in the SVO for that child!.
+
 Voxel Disconnected Component Algorithm:
 - Perhaps the algorithm should start from and only check voxels adjacent to it when using the normal remove voxel function?
 But need to make sure it doesn't do it each time a voxel is removed in fracture propagation which will use the same function.
