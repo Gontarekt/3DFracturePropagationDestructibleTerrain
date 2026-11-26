@@ -24,6 +24,8 @@ void VoxelTerrain::_bind_methods()
 	BIND_GODOT_PROPERTY(FLOAT, noise_frequency, VoxelTerrain)
 	BIND_GODOT_PROPERTY(FLOAT, toughness_noise_frequency, VoxelTerrain)
 	BIND_GODOT_PROPERTY(FLOAT, noise_voxel_spawn_threshold, VoxelTerrain)
+	BIND_GODOT_PROPERTY(FLOAT, min_toughness, VoxelTerrain)
+	BIND_GODOT_PROPERTY(FLOAT, max_toughness, VoxelTerrain)
 
 	BIND_GODOT_PROPERTY_WITH_ARGS(INT, noise_type, VoxelTerrain, PROPERTY_HINT_ENUM, "Simplex,Simplex Smooth, Cellular, Perlin, Value Cubic, Value")
 	BIND_GODOT_PROPERTY_WITH_ARGS(INT, toughness_noise_type, VoxelTerrain, PROPERTY_HINT_ENUM, "Simplex,Simplex Smooth, Cellular, Perlin, Value Cubic, Value")
@@ -617,7 +619,7 @@ void VoxelTerrain::_generate_toughness_debug_mesh()
                 // Render between 2 colours to represent the variation between min and max toughness
                 float toughness = _get_voxel_toughness(Vector3i(x,y,z));
                 // between 0 and 1 from minimum toughness to maximum toughness
-                float toughness_factor = (toughness-min_toughness) / (max_toughness-min_toughness);
+                float toughness_factor = (toughness-_min_toughness) / (_max_toughness-_min_toughness);
                 toughness_factor = std::clamp(toughness_factor, 0.f, 1.f);
                 godot::Color voxel_colour = godot::Color(toughness_factor, 1.0f-toughness_factor, 0.f, 1.f);
 
@@ -906,7 +908,7 @@ float VoxelTerrain::_get_voxel_toughness(Vector3i voxel_position)
 
     float toughness = 0.f;
     // Interpolate between a minimum and maximum toughness based on the noise value
-    toughness = min_toughness + noise_value * (max_toughness - min_toughness);
+    toughness = _min_toughness + (_max_toughness - _min_toughness) * noise_value;
     return toughness;
 }
 

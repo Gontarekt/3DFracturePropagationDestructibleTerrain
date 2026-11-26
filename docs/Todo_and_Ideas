@@ -4,8 +4,10 @@
 
 ## TODO
 
-- Tweak the toughness so that it is logarithmic and has a steeper blend from max toughness to low toughness.
+- Tweak the toughness so that it uses non-linear interpolation (logarithmic?) and has a steeper blend from max toughness to low toughness.
 The object shapes I want fractures to form should have high toughness with comparatively very low toughness surrounding them to encourage separation.
+
+- Current Fracture Propagation stops after few voxels, changing min & max toughness doesn't seem to have an affect, figure out why.
 
 - Implement Fracture Propagation. Will need to research continuum mechanics as well as fracture mechanics.
 'High-resolution brittle fracture simulation with boundary elements' article has source code and provides formulas

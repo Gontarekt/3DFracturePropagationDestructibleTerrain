@@ -33,8 +33,8 @@ private:
     float _noise_voxel_spawn_threshold = 0.3f;
     FastNoiseLite::NoiseType _noise_type = FastNoiseLite::TYPE_SIMPLEX;
     FastNoiseLite::NoiseType _toughness_noise_type = FastNoiseLite::TYPE_SIMPLEX;
-    float max_toughness = 150000.f;
-    float min_toughness = 100000.f;
+    float _max_toughness = 150000.f;
+    float _min_toughness = 100000.f;
 
 
 protected:
@@ -59,6 +59,8 @@ public:
   PROPERTY_GETTER_AND_SETTERS(bool, check_disconnected_components)
   PROPERTY_GETTER_AND_SETTERS(bool, draw_toughness_debug_mesh)
   PROPERTY_GETTER_AND_SETTERS(float, noise_voxel_spawn_threshold)
+  PROPERTY_GETTER_AND_SETTERS(float, max_toughness)
+  PROPERTY_GETTER_AND_SETTERS(float, min_toughness)
 
   void set_noise_frequency(const float new_noise_frequency);
   float get_noise_frequency() const { return _noise_frequency; }

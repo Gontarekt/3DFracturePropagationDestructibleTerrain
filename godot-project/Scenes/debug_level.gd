@@ -163,4 +163,12 @@ func _draw_imgui() -> void:
 	if(ImGui.InputFloat("Toughness Noise Frequency", data_array)):
 		voxel_terrain.toughness_noise_frequency = data_array[0] as float
 
+	data_array = [voxel_terrain.min_toughness]
+	if(ImGui.InputFloat("Minimum Toughness", data_array)):
+		voxel_terrain.min_toughness = data_array[0] as float
+
+	data_array = [voxel_terrain.max_toughness]
+	if(ImGui.InputFloat("Maximum Toughness", data_array)):
+		voxel_terrain.max_toughness = data_array[0] as float
+
 	ImGui.End()
