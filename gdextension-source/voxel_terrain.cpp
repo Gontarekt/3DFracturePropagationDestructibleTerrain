@@ -4,6 +4,7 @@
 #include <libmorton/morton.h>
 #include <bitset>
 #include "godot_cpp/variant/utility_functions.hpp"
+#include "voxel_node.h"
 #include "voxel_object.h"
 #include "voxel_utility.h"
 #include "godot_cpp/classes/shape3d.hpp"
@@ -17,28 +18,18 @@ void VoxelTerrain::_bind_methods()
 {
     BIND_VOXEL_NODE_PROPERTIES(VoxelTerrain);
 
+    BIND_GODOT_PROPERTY_SETTER_AND_GETTERS(check_disconnected_components, VoxelTerrain)
+	BIND_GODOT_PROPERTY_SETTER_AND_GETTERS(draw_toughness_debug_mesh, VoxelTerrain)
+
+	BIND_GODOT_PROPERTY(FLOAT, noise_frequency, VoxelTerrain)
+	BIND_GODOT_PROPERTY(FLOAT, toughness_noise_frequency, VoxelTerrain)
+	BIND_GODOT_PROPERTY(FLOAT, noise_voxel_spawn_threshold, VoxelTerrain)
+
+	BIND_GODOT_PROPERTY_WITH_ARGS(INT, noise_type, VoxelTerrain, PROPERTY_HINT_ENUM, "Simplex,Simplex Smooth, Cellular, Perlin, Value Cubic, Value")
+	BIND_GODOT_PROPERTY_WITH_ARGS(INT, toughness_noise_type, VoxelTerrain, PROPERTY_HINT_ENUM, "Simplex,Simplex Smooth, Cellular, Perlin, Value Cubic, Value")
+
 	ClassDB::bind_method(D_METHOD("create_noise_terrain_SVO"), &VoxelTerrain::create_noise_terrain_SVO);
 	ClassDB::bind_method(D_METHOD("create_solid_cube_SVO"), &VoxelTerrain::create_solid_cube_SVO);
-
-	ClassDB::bind_method(D_METHOD("get_check_disconnected_components"), &VoxelTerrain::get_check_disconnected_components);
-	ClassDB::bind_method(D_METHOD("set_check_disconnected_components", "new_check_disconnected_components"), &VoxelTerrain::set_check_disconnected_components);
-
-	ClassDB::bind_method(D_METHOD("get_draw_toughness_debug_mesh"), &VoxelTerrain::get_draw_toughness_debug_mesh);
-	ClassDB::bind_method(D_METHOD("set_draw_toughness_debug_mesh", "new_draw_toughness_debug_mesh"), &VoxelTerrain::set_draw_toughness_debug_mesh);
-
-	ClassDB::bind_method(D_METHOD("get_noise_frequency"), &VoxelTerrain::get_noise_frequency);
-	ClassDB::bind_method(D_METHOD("set_noise_frequency", "new_noise_frequency"), &VoxelTerrain::set_noise_frequency);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "noise_frequency"), "set_noise_frequency", "get_noise_frequency");
-
-	ClassDB::bind_method(D_METHOD("get_noise_type"), &VoxelTerrain::get_noise_type);
-	ClassDB::bind_method(D_METHOD("set_noise_type", "new_noise_type"), &VoxelTerrain::set_noise_type);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "noise_type", PROPERTY_HINT_ENUM, "Simplex,Simplex Smooth, Cellular, Perlin, Value Cubic, Value"),
-	"set_noise_type", "get_noise_type");
-
-	ClassDB::bind_method(D_METHOD("get_noise_voxel_spawn_threshold"), &VoxelTerrain::get_noise_voxel_spawn_threshold);
-	ClassDB::bind_method(D_METHOD("set_noise_voxel_spawn_threshold", "new_noise_voxel_spawn_threshold"), &VoxelTerrain::set_noise_voxel_spawn_threshold);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "noise_voxel_spawn_threshold"), "set_noise_voxel_spawn_threshold", "get_noise_voxel_spawn_threshold");
-
 	ClassDB::bind_method(D_METHOD("initiate_fracture_propagation", "voxel_position", "initial_force"), &VoxelTerrain::initiate_fracture_propagation);
 }
 
@@ -71,8 +62,8 @@ void VoxelTerrain::_ready()
     terrain_noise_generator->set_frequency(_noise_frequency);
 
     toughness_noise_generator.instantiate();
-    toughness_noise_generator->set_noise_type(FastNoiseLite::TYPE_SIMPLEX);
-    toughness_noise_generator->set_frequency(0.02);
+    toughness_noise_generator->set_noise_type(_toughness_noise_type);
+    toughness_noise_generator->set_frequency(_toughness_noise_frequency);
     toughness_noise_generator->set_seed(toughness_noise_generator->get_seed()+1.f);
 
     create_noise_terrain_SVO();
@@ -180,8 +171,6 @@ void VoxelTerrain::create_noise_terrain_SVO()
     // Clear Previous Voxels
     sparse_voxel_octree.clear_voxels();
 
-     UtilityFunctions::print("Noise Type: ", _noise_type);
-
     // NOTE: This breaks if you output too many godot debug statements!
     std::chrono::time_point<std::chrono::steady_clock> start_time = std::chrono::steady_clock::now();
     for (int x = 0; x < terrain_chunk_size; x++)
@@ -211,7 +200,32 @@ void VoxelTerrain::create_noise_terrain_SVO()
 // Getters & Setters
 
 
-// Nothing yet
+void VoxelTerrain::set_noise_frequency(const float new_noise_frequency)
+{
+    _noise_frequency = new_noise_frequency;
+    terrain_noise_generator->set_frequency(_noise_frequency);
+}
+
+
+void VoxelTerrain::set_toughness_noise_frequency(const float new_toughness_noise_frequency)
+{
+    _toughness_noise_frequency = new_toughness_noise_frequency;
+    toughness_noise_generator->set_frequency(_toughness_noise_frequency);
+}
+
+
+void VoxelTerrain::set_noise_type(const FastNoiseLite::NoiseType new_noise_type)
+{
+    _noise_type = new_noise_type;
+    terrain_noise_generator->set_noise_type(_noise_type);
+}
+
+
+void VoxelTerrain::set_toughness_noise_type(const FastNoiseLite::NoiseType new_toughness_noise_type)
+{
+    _toughness_noise_type = new_toughness_noise_type;
+    toughness_noise_generator->set_noise_type(_toughness_noise_type);
+}
 
 
 ////////////////////
@@ -603,7 +617,7 @@ void VoxelTerrain::_generate_toughness_debug_mesh()
                 // Render between 2 colours to represent the variation between min and max toughness
                 float toughness = _get_voxel_toughness(Vector3i(x,y,z));
                 // between 0 and 1 from minimum toughness to maximum toughness
-                float toughness_factor = (toughness-MINIMUM_TOUGHNESS) / (MAXIMUM_TOUGHNESS-MINIMUM_TOUGHNESS);
+                float toughness_factor = (toughness-min_toughness) / (max_toughness-min_toughness);
                 toughness_factor = std::clamp(toughness_factor, 0.f, 1.f);
                 godot::Color voxel_colour = godot::Color(toughness_factor, 1.0f-toughness_factor, 0.f, 1.f);
 
@@ -884,7 +898,7 @@ float VoxelTerrain::_get_voxel_toughness(Vector3i voxel_position)
 
     float toughness = 0.f;
     // Interpolate between a minimum and maximum toughness based on the noise value
-    toughness = MINIMUM_TOUGHNESS + noise_value * (MAXIMUM_TOUGHNESS - MINIMUM_TOUGHNESS);
+    toughness = min_toughness + noise_value * (max_toughness - min_toughness);
     return toughness;
 }
 

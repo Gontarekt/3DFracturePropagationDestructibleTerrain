@@ -138,14 +138,29 @@ func _draw_imgui() -> void:
 		voxel_terrain.set_mesh_needs_generated(true)
 	if(ImGui.Button("Disconnected Voxels Scan")):
 		voxel_terrain.set_check_disconnected_components(true)
+
 	data_array = [voxel_terrain.get_draw_toughness_debug_mesh()]
 	if(ImGui.Checkbox("Draw toughness debug mesh", data_array)):
 		voxel_terrain.set_draw_toughness_debug_mesh(data_array[0])
+
 	data_array = [voxel_terrain.noise_voxel_spawn_threshold]
 	if(ImGui.SliderFloat("Voxel Noise Threshold", data_array, -1.0, 1.0)):
 		voxel_terrain.noise_voxel_spawn_threshold = data_array[0]
+
 	data_array = [voxel_terrain.noise_type]
-	if(ImGui.Combo("Noise Type", data_array, ["Simplex", "Simplex Smooth", "Cellular", "Perlin", "Value Cubic", "Value"])):
+	if(ImGui.Combo("Terrain Noise Type", data_array, ["Simplex", "Simplex Smooth", "Cellular", "Perlin", "Value Cubic", "Value"])):
 		voxel_terrain.noise_type = data_array[0] as FastNoiseLite.NoiseType
+
+	data_array = [voxel_terrain.noise_frequency]
+	if(ImGui.InputFloat("Terrain Noise Frequency", data_array)):
+		voxel_terrain.noise_frequency = data_array[0] as float
+
+	data_array = [voxel_terrain.toughness_noise_type]
+	if(ImGui.Combo("Toughness Noise Type", data_array, ["Simplex", "Simplex Smooth", "Cellular", "Perlin", "Value Cubic", "Value"])):
+		voxel_terrain.toughness_noise_type = data_array[0] as FastNoiseLite.NoiseType
+
+	data_array = [voxel_terrain.toughness_noise_frequency]
+	if(ImGui.InputFloat("Toughness Noise Frequency", data_array)):
+		voxel_terrain.toughness_noise_frequency = data_array[0] as float
 
 	ImGui.End()

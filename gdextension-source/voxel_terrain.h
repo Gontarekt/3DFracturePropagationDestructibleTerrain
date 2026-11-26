@@ -18,8 +18,8 @@ public:
 private:
     // Based these toughness values roughly on the article: https://dl.acm.org/doi/epdf/10.1145/2766896
     // Toughness: 1.0E+5 +50%
-    static constexpr float MINIMUM_TOUGHNESS = 100000.f;
-    static constexpr float MAXIMUM_TOUGHNESS = 150000.f;
+    //static constexpr float MINIMUM_TOUGHNESS = 100000.f;
+    //static constexpr float MAXIMUM_TOUGHNESS = 150000.f;
 
     Ref<FastNoiseLite> terrain_noise_generator;
     Ref<FastNoiseLite> toughness_noise_generator;
@@ -28,9 +28,13 @@ private:
 
     bool _check_disconnected_components = false;
     bool _draw_toughness_debug_mesh = true;
-    float _noise_frequency;
-    float _noise_voxel_spawn_threshold;
-    FastNoiseLite::NoiseType _noise_type;
+    float _noise_frequency = 0.02f;
+    float _toughness_noise_frequency = 0.1f;
+    float _noise_voxel_spawn_threshold = 0.3f;
+    FastNoiseLite::NoiseType _noise_type = FastNoiseLite::TYPE_SIMPLEX;
+    FastNoiseLite::NoiseType _toughness_noise_type = FastNoiseLite::TYPE_SIMPLEX;
+    float max_toughness = 150000.f;
+    float min_toughness = 100000.f;
 
 
 protected:
@@ -52,16 +56,22 @@ public:
 
   // Getters & Setters
 
-  void set_check_disconnected_components(const bool new_check_disconnected_components) { _check_disconnected_components = new_check_disconnected_components; };
-  bool get_check_disconnected_components() const { return _check_disconnected_components; }
-  void set_draw_toughness_debug_mesh(const bool new_draw_toughness_debug_mesh) { _draw_toughness_debug_mesh = new_draw_toughness_debug_mesh; };
-  bool get_draw_toughness_debug_mesh() const { return _draw_toughness_debug_mesh; }
-  void set_noise_frequency(const float new_noise_frequency) { _noise_frequency = new_noise_frequency; };
+  PROPERTY_GETTER_AND_SETTERS(bool, check_disconnected_components)
+  PROPERTY_GETTER_AND_SETTERS(bool, draw_toughness_debug_mesh)
+  PROPERTY_GETTER_AND_SETTERS(float, noise_voxel_spawn_threshold)
+
+  void set_noise_frequency(const float new_noise_frequency);
   float get_noise_frequency() const { return _noise_frequency; }
-  void set_noise_voxel_spawn_threshold(const float new_noise_voxel_spawn_threshold) { _noise_voxel_spawn_threshold = new_noise_voxel_spawn_threshold; };
-  float get_noise_voxel_spawn_threshold() const { return _noise_voxel_spawn_threshold; }
-  void set_noise_type(const FastNoiseLite::NoiseType new_noise_type) { _noise_type = new_noise_type; };
+
+  void set_toughness_noise_frequency(const float new_toughness_noise_frequency);
+  float get_toughness_noise_frequency() const { return _toughness_noise_frequency; }
+
+  void set_noise_type(const FastNoiseLite::NoiseType new_noise_type);
   FastNoiseLite::NoiseType get_noise_type() const { return _noise_type; }
+
+  void set_toughness_noise_type(const FastNoiseLite::NoiseType new_toughness_noise_type);
+  FastNoiseLite::NoiseType get_toughness_noise_type() const { return _toughness_noise_type; }
+
 
 private:
   // For debugging the morton codes
