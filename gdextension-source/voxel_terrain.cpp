@@ -892,9 +892,17 @@ float VoxelTerrain::_get_voxel_toughness(Vector3i voxel_position)
 {
     // Expected output of -1 to 1 that is spatially varied
     float noise_value = toughness_noise_generator->get_noise_3d(voxel_position.x, voxel_position.y, voxel_position.z);
-    // Convert from (-1 to 1) to (0 to 1)
-    noise_value += 1;
-    noise_value /= 2;
+    if (_toughness_noise_type != FastNoiseLite::NoiseType::TYPE_CELLULAR)
+    {
+        // Convert from (-1 to 1) to (0 to 1)
+        noise_value += 1;
+        noise_value /= 2;
+    }
+    else
+    {
+        // Convert from (-1 to 0) to (0 to 1)
+        noise_value += 1;
+    }
 
     float toughness = 0.f;
     // Interpolate between a minimum and maximum toughness based on the noise value
