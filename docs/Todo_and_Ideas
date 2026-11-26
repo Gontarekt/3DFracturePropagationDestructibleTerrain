@@ -15,7 +15,6 @@ The object shapes I want fractures to form should have high toughness with compa
 'High-resolution brittle fracture simulation with boundary elements' article has source code and provides formulas
 for stress intensity so I can use that for reference.
 
-- Raycast VoxelGrid step-through logic (Currently can only hit boundary voxels due to the simple convex collider).
 - Fix issue with disconnected voxel fragments phasing through terrain
 
 - Setup chunks for VoxelTerrain:
